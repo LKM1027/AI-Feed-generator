@@ -1,0 +1,10 @@
+python-dotenv
+google-genai
+langgraph
+langchain-core
+pydantic
+typing-extensions
+pillow
+fastapi
+uvicorn
+python-multipart
