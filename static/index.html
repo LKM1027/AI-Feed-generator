@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🏺 도자기 인스타 피드 생성기 — AI 콘텐츠 도우미</title>
+  <meta name="description" content="도자기 공방 사진을 AI가 분석하여 인스타그램 피드용 이미지, 캡션, 해시태그를 자동 생성합니다." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0c0a09;
+      --bg2:      #161210;
+      --surface:  rgba(255, 235, 210, 0.045);
+      --surf-hov: rgba(255, 235, 210, 0.08);
+      --border:   rgba(196, 112, 58, 0.18);
+      --border-lit: rgba(232, 149, 109, 0.45);
+      --accent:   #c4703a;
+      --accent2:  #e8956d;
+      --text:     #f0e4d0;
+      --muted:    #7a6555;
+      --dim:      #3a2820;
+      --success:  #6db88e;
+      --error:    #e06060;
+      --r:        14px;
+      --r-lg:     22px;
+      --r-sm:     9px;
+      --ease:     0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background glow ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 12% 18%, rgba(196, 112, 58, 0.09) 0%, transparent 55%),
+        radial-gradient(ellipse 55% 38% at 88% 82%, rgba(139, 69, 19, 0.07) 0%, transparent 50%),
+        radial-gradient(ellipse 90% 70% at 50% -10%, rgba(232, 149, 109, 0.04) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+      animation: bgPulse 9s ease-in-out infinite;
+    }
+
+    @keyframes bgPulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 1.5rem 5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 3.5rem 0 2.5rem;
+    }
+
+    .logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(196,112,58,0.18) 0%, transparent 70%);
+      border: 1px solid var(--border-lit);
+      font-size: 2.1rem;
+      margin-bottom: 1.1rem;
+      animation: float 5s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-7px); }
+    }
+
+    header h1 {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 2rem;
+      font-weight: 600;
+      background: linear-gradient(140deg, var(--text) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.55rem;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 300;
+      line-height: 1.6;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 1.6rem 1.75rem;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: border-color var(--ease);
+      margin-bottom: 1.1rem;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Upload ── */
+    .drop-zone {
+      border: 1.5px dashed var(--border-lit);
+      border-radius: var(--r);
+      padding: 2.75rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--ease);
+      position: relative;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(196, 112, 58, 0.05);
+    }
+
+    .drop-zone.drag-over { transform: scale(1.01); }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { font-size: 2.2rem; display: block; margin-bottom: 0.65rem; }
+
+    .drop-zone .drop-main {
+      color: var(--text);
+      font-size: 0.92rem;
+      font-weight: 500;
+      margin-bottom: 0.3rem;
+    }
+
+    .drop-zone .drop-hint {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .preview-area {
+      display: none;
+      align-items: center;
+      gap: 1.1rem;
+    }
+
+    .preview-area.show { display: flex; }
+
+    .preview-thumb {
+      width: 72px;
+      height: 72px;
+      border-radius: var(--r-sm);
+      object-fit: cover;
+      border: 1.5px solid var(--border-lit);
+      flex-shrink: 0;
+    }
+
+    .preview-info { flex: 1; min-width: 0; }
+
+    .preview-name {
+      font-size: 0.88rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 0.2rem;
+    }
+
+    .preview-size { font-size: 0.78rem; color: var(--muted); }
+
+    .btn-reset {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--muted);
+      padding: 0.38rem 0.85rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: all var(--ease);
+      flex-shrink: 0;
+      font-family: inherit;
+    }
+
+    .btn-reset:hover { border-color: var(--accent); color: var(--accent2); }
+
+    /* ── Style Cards ── */
+    .style-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+    }
+
+    .style-option {
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      padding: 1.1rem 0.85rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--ease);
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .style-option::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity var(--ease);
+      border-radius: inherit;
+    }
+
+    .style-option[data-style="warm"]::before     { background: radial-gradient(ellipse at top, rgba(196,112,58,0.14), transparent 70%); }
+    .style-option[data-style="minimal"]::before  { background: radial-gradient(ellipse at top, rgba(220,215,205,0.09), transparent 70%); }
+    .style-option[data-style="japanese"]::before { background: radial-gradient(ellipse at top, rgba(100,155,130,0.1), transparent 70%); }
+
+    .style-option:hover::before,
+    .style-option.active::before { opacity: 1; }
+
+    .style-option.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), 0 6px 28px rgba(196,112,58,0.18);
+    }
+
+    .style-option:hover:not(.active) { border-color: rgba(196,112,58,0.45); }
+
+    .style-emoji { font-size: 1.65rem; display: block; margin-bottom: 0.45rem; }
+
+    .style-option h3 {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.28rem;
+    }
+
+    .style-option p { font-size: 0.73rem; color: var(--muted); line-height: 1.45; }
+
+    /* ── Generate Button ── */
+    #btnGenerate {
+      width: 100%;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      border: none;
+      border-radius: var(--r);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--ease);
+      margin-bottom: 1.1rem;
+      letter-spacing: 0.025em;
+      position: relative;
+      overflow: hidden;
+      font-family: inherit;
+    }
+
+    #btnGenerate::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background var(--ease);
+    }
+
+    #btnGenerate:hover:not(:disabled)::after { background: rgba(255,255,255,0.09); }
+    #btnGenerate:active:not(:disabled) { transform: scale(0.99); }
+    #btnGenerate:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    /* ── Error Box ── */
+    .error-box {
+      display: none;
+      background: rgba(224,96,96,0.08);
+      border: 1px solid rgba(224,96,96,0.28);
+      border-radius: var(--r);
+      padding: 0.9rem 1.1rem;
+      font-size: 0.85rem;
+      color: var(--error);
+      margin-bottom: 1.1rem;
+    }
+
+    .error-box.show { display: block; animation: fadeUp 0.3s ease; }
+
+    /* ── Loading ── */
+    #loadingSection { display: none; }
+    #loadingSection.show { display: block; animation: fadeUp 0.4s ease; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .loading-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 2.5px solid var(--dim);
+      border-top-color: var(--accent);
+      animation: spin 0.85s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-title {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 1.05rem;
+      font-weight: 600;
+    }
+
+    .loading-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.18rem; }
+
+    .pipeline-steps { display: flex; flex-direction: column; gap: 0.5rem; }
+
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.65rem 0.9rem;
+      border-radius: var(--r-sm);
+      border: 1px solid transparent;
+      transition: all 0.45s ease;
+    }
+
+    .step-icon { font-size: 1rem; flex-shrink: 0; width: 1.4rem; text-align: center; }
+    .step-name { font-size: 0.84rem; color: var(--muted); flex: 1; transition: color 0.4s; }
+    .step-badge {
+      font-size: 0.68rem;
+      padding: 0.18rem 0.55rem;
+      border-radius: 20px;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    /* waiting */
+    .pipeline-step.waiting .step-badge { opacity: 0; }
+
+    /* active */
+    .pipeline-step.active {
+      background: rgba(196,112,58,0.07);
+      border-color: var(--border);
+    }
+    .pipeline-step.active .step-name { color: var(--text); }
+    .pipeline-step.active .step-badge {
+      opacity: 1;
+      background: rgba(196,112,58,0.18);
+      color: var(--accent2);
+    }
+    .pipeline-step.active .step-badge::after { content: '진행 중'; }
+
+    /* done */
+    .pipeline-step.done .step-name { color: var(--muted); }
+    .pipeline-step.done .step-badge {
+      opacity: 1;
+      background: rgba(109,184,142,0.12);
+      color: var(--success);
+    }
+    .pipeline-step.done .step-badge::after { content: '완료 ✓'; }
+
+    /* ── Results ── */
+    #resultsSection { display: none; }
+    #resultsSection.show { display: block; animation: fadeUp 0.55s ease; }
+
+    .results-header {
+      text-align: center;
+      margin-bottom: 1.4rem;
+    }
+
+    .results-title {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 1.4rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--text), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.35rem;
+    }
+
+    .mood-badge {
+      display: inline-block;
+      background: rgba(196,112,58,0.12);
+      border: 1px solid rgba(196,112,58,0.25);
+      border-radius: 20px;
+      padding: 0.28rem 0.9rem;
+      font-size: 0.78rem;
+      color: var(--accent2);
+      font-style: italic;
+    }
+
+    .results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.1rem;
+      margin-bottom: 1.1rem;
+    }
+
+    /* Generated Image */
+    .result-img-wrap {
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      aspect-ratio: 1 / 1;
+      background: var(--bg2);
+      position: relative;
+    }
+
+    .result-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      transition: opacity 0.5s ease;
+    }
+
+    .no-img-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      gap: 0.5rem;
+    }
+
+    .no-img-placeholder span:first-child { font-size: 2rem; }
+
+    /* Right column */
+    .result-right {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    /* Caption & Hashtags cards */
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 1.1rem 1.2rem;
+      flex: 1;
+    }
+
+    .result-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      font-weight: 600;
+    }
+
+    .btn-copy {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: var(--surf-hov);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--muted);
+      padding: 0.28rem 0.7rem;
+      font-size: 0.74rem;
+      cursor: pointer;
+      transition: all var(--ease);
+      font-family: inherit;
+      flex-shrink: 0;
+    }
+
+    .btn-copy:hover {
+      border-color: var(--accent);
+      color: var(--accent2);
+      background: rgba(196,112,58,0.07);
+    }
+
+    .btn-copy.copied {
+      border-color: var(--success);
+      color: var(--success);
+      background: rgba(109,184,142,0.08);
+    }
+
+    .caption-text {
+      font-family: 'Noto Serif KR', serif;
+      font-size: 0.88rem;
+      line-height: 1.8;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Hashtag chips */
+    .hashtag-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .chip {
+      background: rgba(196,112,58,0.09);
+      border: 1px solid rgba(196,112,58,0.22);
+      border-radius: 20px;
+      padding: 0.3rem 0.85rem;
+      font-size: 0.78rem;
+      color: var(--accent2);
+      cursor: pointer;
+      transition: all var(--ease);
+      user-select: none;
+    }
+
+    .chip:hover {
+      background: rgba(196,112,58,0.18);
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .chip:active { transform: scale(0.96); }
+
+    .hashtags-footer { display: flex; justify-content: flex-end; }
+
+    /* Regen button */
+    .btn-regen {
+      width: 100%;
+      padding: 0.85rem;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      color: var(--muted);
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all var(--ease);
+      font-family: inherit;
+    }
+
+    .btn-regen:hover {
+      border-color: var(--accent);
+      color: var(--accent2);
+      background: rgba(196,112,58,0.04);
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(20,16,12,0.95);
+      border: 1px solid var(--border-lit);
+      border-radius: var(--r-sm);
+      padding: 0.7rem 1.4rem;
+      font-size: 0.84rem;
+      color: var(--text);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 999;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    .toast-icon { color: var(--success); }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.55rem; }
+      .style-grid { grid-template-columns: 1fr; gap: 0.5rem; }
+      .style-option { display: flex; align-items: center; gap: 0.75rem; text-align: left; padding: 0.85rem 1rem; }
+      .style-emoji { margin-bottom: 0; font-size: 1.4rem; }
+      .results-grid { grid-template-columns: 1fr; }
+      .result-img-wrap { max-height: 280px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="logo-wrap">🏺</div>
+    <h1>도자기 인스타 피드 생성기</h1>
+    <p>공방 사진 한 장으로 AI가 감성 이미지·캡션·해시태그를 만들어 드립니다</p>
+  </header>
+
+  <!-- ── 01 Upload ── -->
+  <div class="card" id="uploadCard">
+    <div class="section-label">01 — 사진 업로드</div>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*" aria-label="이미지 파일 선택" />
+      <span class="drop-icon">📷</span>
+      <p class="drop-main">사진을 여기에 드래그하거나 클릭해서 선택하세요</p>
+      <p class="drop-hint">JPG · PNG · WEBP — 최대 20 MB</p>
+    </div>
+    <div class="preview-area" id="previewArea">
+      <img class="preview-thumb" id="previewThumb" src="" alt="미리보기" />
+      <div class="preview-info">
+        <div class="preview-name" id="previewName"></div>
+        <div class="preview-size" id="previewSize"></div>
+      </div>
+      <button class="btn-reset" id="btnReset">다시 선택</button>
+    </div>
+  </div>
+
+  <!-- ── 02 Style ── -->
+  <div class="card">
+    <div class="section-label">02 — 스타일 선택</div>
+    <div class="style-grid" role="radiogroup" aria-label="스타일 선택">
+      <div class="style-option active" data-style="warm" id="opt-warm" role="radio" aria-checked="true" tabindex="0">
+        <span class="style-emoji">🌅</span>
+        <h3>따뜻한</h3>
+        <p>자연광과 온기 있는 따뜻한 무드</p>
+      </div>
+      <div class="style-option" data-style="minimal" id="opt-minimal" role="radio" aria-checked="false" tabindex="0">
+        <span class="style-emoji">🤍</span>
+        <h3>미니멀</h3>
+        <p>깔끔하고 절제된 세련된 감성</p>
+      </div>
+      <div class="style-option" data-style="japanese" id="opt-japanese" role="radio" aria-checked="false" tabindex="0">
+        <span class="style-emoji">🎋</span>
+        <h3>일본풍</h3>
+        <p>고요하고 우아한 와비사비 미학</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Generate Button ── -->
+  <button id="btnGenerate" disabled aria-label="AI 피드 생성하기">
+    ✨ &nbsp;AI 피드 생성하기
+  </button>
+
+  <!-- ── Error ── -->
+  <div class="error-box" id="errorBox" role="alert"></div>
+
+  <!-- ── Loading ── -->
+  <div class="card" id="loadingSection" aria-live="polite" aria-label="생성 진행 상황">
+    <div class="loading-header">
+      <div class="spinner"></div>
+      <div>
+        <div class="loading-title">AI가 콘텐츠를 생성하고 있어요</div>
+        <div class="loading-sub">잠시만 기다려 주세요 · 약 30 ~ 50초 소요</div>
+      </div>
+    </div>
+    <div class="pipeline-steps">
+      <div class="pipeline-step waiting" data-step="0">
+        <span class="step-icon">🔍</span>
+        <span class="step-name">이미지 분석 (Gemini Vision)</span>
+        <span class="step-badge"></span>
+      </div>
+      <div class="pipeline-step waiting" data-step="1">
+        <span class="step-icon">🎨</span>
+        <span class="step-name">감성 무드 추출</span>
+        <span class="step-badge"></span>
+      </div>
+      <div class="pipeline-step waiting" data-step="2">
+        <span class="step-icon">✍️</span>
+        <span class="step-name">이미지 생성 프롬프트 작성</span>
+        <span class="step-badge"></span>
+      </div>
+      <div class="pipeline-step waiting" data-step="3">
+        <span class="step-icon">🖼️</span>
+        <span class="step-name">Imagen 3 이미지 생성</span>
+        <span class="step-badge"></span>
+      </div>
+      <div class="pipeline-step waiting" data-step="4">
+        <span class="step-icon">📝</span>
+        <span class="step-name">인스타그램 캡션 작성</span>
+        <span class="step-badge"></span>
+      </div>
+      <div class="pipeline-step waiting" data-step="5">
+        <span class="step-icon">🏷️</span>
+        <span class="step-name">해시태그 생성</span>
+        <span class="step-badge"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="resultsSection">
+
+    <div class="results-header">
+      <div class="results-title">✨ 생성 완료!</div>
+      <div class="mood-badge" id="moodBadge"></div>
+    </div>
+
+    <div class="results-grid">
+
+      <!-- Generated Image -->
+      <div class="result-img-wrap" id="resultImgWrap">
+        <img id="resultImg" src="" alt="AI 생성 이미지" />
+        <div class="no-img-placeholder" id="noImgPlaceholder">
+          <span>🖼️</span>
+          <span>이미지 생성에 실패했습니다</span>
+        </div>
+      </div>
+
+      <!-- Caption + Hashtags -->
+      <div class="result-right">
+
+        <!-- Caption -->
+        <div class="result-card" style="flex: 0 0 auto;">
+          <div class="result-card-header">
+            <span class="card-label">캡션</span>
+            <button class="btn-copy" id="btnCopyCaption">
+              <span>📋</span><span id="lblCopyCaption">복사</span>
+            </button>
+          </div>
+          <div class="caption-text" id="captionText"></div>
+        </div>
+
+        <!-- Hashtags -->
+        <div class="result-card" style="flex: 1;">
+          <div class="result-card-header">
+            <span class="card-label">해시태그</span>
+            <button class="btn-copy" id="btnCopyHashtags">
+              <span>📋</span><span id="lblCopyHashtags">전체 복사</span>
+            </button>
+          </div>
+          <div class="hashtag-chips" id="hashtagChips"></div>
+          <div class="hashtags-footer">
+            <span style="font-size:0.72rem;color:var(--muted);">개별 태그를 클릭하면 바로 복사됩니다</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Re-generate -->
+    <button class="btn-regen" id="btnRegen">🔄 &nbsp;새로운 피드 생성하기</button>
+
+  </div><!-- /resultsSection -->
+
+</div><!-- /container -->
+
+<!-- ── Toast ── -->
+<div id="toast" role="status" aria-live="polite">
+  <span class="toast-icon">✓</span>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+  /* ── State ── */
+  let selectedFile = null;
+  let selectedStyle = 'warm';
+  let captionStr = '';
+  let hashtagsArr = [];
+  let stepTimers = [];
+
+  // Step transition timings (ms after start): each value = when step[i] → done, step[i+1] → active
+  const STEP_TRANS = [4500, 9000, 13500, 27000, 33000];
+
+  /* ── DOM refs ── */
+  const dropZone       = document.getElementById('dropZone');
+  const fileInput      = document.getElementById('fileInput');
+  const previewArea    = document.getElementById('previewArea');
+  const previewThumb   = document.getElementById('previewThumb');
+  const previewName    = document.getElementById('previewName');
+  const previewSize    = document.getElementById('previewSize');
+  const btnReset       = document.getElementById('btnReset');
+  const btnGenerate    = document.getElementById('btnGenerate');
+  const errorBox       = document.getElementById('errorBox');
+  const loadingSection = document.getElementById('loadingSection');
+  const resultsSection = document.getElementById('resultsSection');
+  const resultImg      = document.getElementById('resultImg');
+  const noImgPh        = document.getElementById('noImgPlaceholder');
+  const captionEl      = document.getElementById('captionText');
+  const hashtagChipsEl = document.getElementById('hashtagChips');
+  const moodBadge      = document.getElementById('moodBadge');
+  const toast          = document.getElementById('toast');
+  const toastMsg       = document.getElementById('toastMsg');
+  const btnCopyCaption = document.getElementById('btnCopyCaption');
+  const btnCopyHashtags= document.getElementById('btnCopyHashtags');
+
+  /* ── Drag & Drop ── */
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) setFile(f);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  btnReset.addEventListener('click', clearFile);
+
+  function setFile(f) {
+    selectedFile = f;
+    previewThumb.src = URL.createObjectURL(f);
+    previewName.textContent = f.name;
+    previewSize.textContent = fmtSize(f.size);
+    dropZone.style.display = 'none';
+    previewArea.classList.add('show');
+    btnGenerate.disabled = false;
+  }
+
+  function clearFile() {
+    selectedFile = null;
+    fileInput.value = '';
+    previewArea.classList.remove('show');
+    dropZone.style.display = '';
+    btnGenerate.disabled = true;
+  }
+
+  function fmtSize(b) {
+    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+    return (b / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  /* ── Style Selection ── */
+  document.querySelectorAll('.style-option').forEach(opt => {
+    opt.addEventListener('click', () => selectStyle(opt));
+    opt.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') selectStyle(opt); });
+  });
+
+  function selectStyle(opt) {
+    document.querySelectorAll('.style-option').forEach(o => {
+      o.classList.remove('active');
+      o.setAttribute('aria-checked', 'false');
+    });
+    opt.classList.add('active');
+    opt.setAttribute('aria-checked', 'true');
+    selectedStyle = opt.dataset.style;
+  }
+
+  /* ── Generate ── */
+  btnGenerate.addEventListener('click', generate);
+
+  async function generate() {
+    if (!selectedFile) return;
+
+    // Reset UI state
+    errorBox.classList.remove('show');
+    resultsSection.classList.remove('show');
+    btnGenerate.disabled = true;
+
+    // Reset pipeline steps
+    document.querySelectorAll('.pipeline-step').forEach(s => s.className = 'pipeline-step waiting');
+
+    loadingSection.classList.add('show');
+    startStepAnimation();
+
+    const fd = new FormData();
+    fd.append('image', selectedFile);
+    fd.append('style', selectedStyle);
+
+    try {
+      const res = await fetch('/api/generate', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+
+      clearStepTimers();
+      completeAllSteps();
+
+      await delay(500);
+      showResults(data);
+    } catch (err) {
+      clearStepTimers();
+      loadingSection.classList.remove('show');
+      errorBox.textContent = '오류가 발생했습니다: ' + err.message;
+      errorBox.classList.add('show');
+      btnGenerate.disabled = false;
+    }
+  }
+
+  /* ── Step Animation ── */
+  function startStepAnimation() {
+    const steps = document.querySelectorAll('.pipeline-step');
+    // Step 0 starts immediately
+    if (steps[0]) steps[0].className = 'pipeline-step active';
+
+    STEP_TRANS.forEach((ms, i) => {
+      const t = setTimeout(() => {
+        if (steps[i])   steps[i].className = 'pipeline-step done';
+        if (steps[i+1]) steps[i+1].className = 'pipeline-step active';
+      }, ms);
+      stepTimers.push(t);
+    });
+  }
+
+  function clearStepTimers() {
+    stepTimers.forEach(t => clearTimeout(t));
+    stepTimers = [];
+  }
+
+  function completeAllSteps() {
+    document.querySelectorAll('.pipeline-step').forEach(s => s.className = 'pipeline-step done');
+  }
+
+  /* ── Show Results ── */
+  function showResults(data) {
+    loadingSection.classList.remove('show');
+
+    captionStr   = data.caption  || '';
+    hashtagsArr  = data.hashtags || [];
+
+    // Mood
+    if (data.mood) {
+      moodBadge.textContent = '✦ ' + data.mood;
+      moodBadge.style.display = '';
+    } else {
+      moodBadge.style.display = 'none';
+    }
+
+    // Caption
+    captionEl.textContent = captionStr;
+
+    // Hashtag chips
+    hashtagChipsEl.innerHTML = '';
+    hashtagsArr.forEach(tag => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = tag;
+      chip.title = '클릭하면 복사';
+      chip.addEventListener('click', () => {
+        copyText(tag).then(() => showToast(tag + ' 복사됨!'));
+      });
+      hashtagChipsEl.appendChild(chip);
+    });
+
+    // Generated image
+    if (data.image_url) {
+      resultImg.onload = () => { resultImg.style.display = 'block'; noImgPh.style.display = 'none'; };
+      resultImg.onerror = () => { resultImg.style.display = 'none'; noImgPh.style.display = 'flex'; };
+      resultImg.src = data.image_url;
+    } else {
+      resultImg.style.display = 'none';
+      noImgPh.style.display = 'flex';
+    }
+
+    resultsSection.classList.add('show');
+    requestAnimationFrame(() => {
+      resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  /* ── Copy ── */
+  btnCopyCaption.addEventListener('click', () => {
+    copyText(captionStr).then(() => {
+      flashCopied(btnCopyCaption, document.getElementById('lblCopyCaption'), '복사', '복사됨 ✓');
+      showToast('캡션이 복사되었습니다!');
+    });
+  });
+
+  btnCopyHashtags.addEventListener('click', () => {
+    const all = hashtagsArr.join(' ');
+    copyText(all).then(() => {
+      flashCopied(btnCopyHashtags, document.getElementById('lblCopyHashtags'), '전체 복사', '복사됨 ✓');
+      showToast('해시태그 전체가 복사되었습니다!');
+    });
+  });
+
+  function flashCopied(btn, lbl, defaultTxt, copiedTxt) {
+    btn.classList.add('copied');
+    lbl.textContent = copiedTxt;
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      lbl.textContent = defaultTxt;
+    }, 2200);
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      // Fallback for non-HTTPS
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+  }
+
+  /* ── Toast ── */
+  let toastTimer = null;
+  function showToast(msg) {
+    toastMsg.textContent = msg;
+    toast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+  }
+
+  /* ── Reset ── */
+  document.getElementById('btnRegen').addEventListener('click', resetAll);
+
+  function resetAll() {
+    clearFile();
+    captionStr = '';
+    hashtagsArr = [];
+    loadingSection.classList.remove('show');
+    resultsSection.classList.remove('show');
+    errorBox.classList.remove('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
