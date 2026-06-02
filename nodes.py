@@ -359,7 +359,7 @@ def generate_image(state: FeedGenerationState) -> Dict[str, Any]:
         encoded_negative = urllib.parse.quote(negative_words)
         
         # 2. Pollinations.ai 무료 API URL 구성 (가로세로 1024px, 로고 제거)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1350&nologo=true&negative_prompt={encoded_negative}"
         
         # 3. API에 요청을 보내서 이미지 바이트 데이터 받아오기
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
