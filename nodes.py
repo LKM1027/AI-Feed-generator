@@ -9,14 +9,16 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from PIL import Image
 
+import urllib.request
+import urllib.parse
+
 from state import FeedGenerationState
 
 # google-genai imports (modern SDK)
 from google import genai
 from google.genai import types
 
-load_dotenv()
-
+load_dotenv(override=True)
 
 # ========== Pydantic Schemas (Structured Outputs) ==========
 class ImageAnalysisResult(BaseModel):
@@ -48,6 +50,7 @@ def get_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY가 .env 파일에 없거나 로드되지 않았습니다.")
+    print(f"[DEBUG] 현재 주입된 API 키 끝 4자리: {api_key[-4:]}")
     return genai.Client(api_key=api_key)
 
 
@@ -83,7 +86,7 @@ def _call_with_retry(fn, max_retries: int = 3):
 
 
 # 텍스트 노드용 모델 우선순위 (독립적인 quota 버킷)
-TEXT_MODELS = ["gemini-2.0-flash-lite", "gemini-2.0-flash"]
+TEXT_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
 
 
 def _generate_text(client, contents, config) -> Any:
@@ -214,11 +217,13 @@ def generate_prompt(state: FeedGenerationState) -> Dict[str, Any]:
         preset_error = preset.get("error_message", "")
 
         prompt = (
-            f"Using the following style preset and image analysis, create an English image-generation prompt for high-quality photorealistic Instagram content.\n"
+            f"Using the following style preset and image analysis, create an English image-generation prompt for a casual, realistic Instagram snapshot.\n"
             f"Style preset:\n{preset_text}\n\n"
             f"Mood: {mood}\n"
-            f"Image Details: {json.dumps(analysis, ensure_ascii=False) if isinstance(analysis, dict) else str(analysis)}\n"
-            f"Focus on handcrafted pottery, warm natural lighting, shallow depth of field, and a cozy studio atmosphere."
+            f"Image Details: {json.dumps(analysis, ensure_ascii=False) if isinstance(analysis, dict) else str(analysis)}\n\n"
+            f"[CRITICAL RULES FOR REALISM]\n"
+            f"1. VIBE: 'Shot on iPhone', candid amateur photography, natural window light. STRICTLY AVOID cinematic, dramatic, or 3D rendered looks.\n"
+            f"2. TEXTURE: Keep the pottery surface simple, natural, and slightly imperfect. STRICTLY AVOID generating intricate, unnatural, or alien-like carved patterns."
         )
 
         response = _generate_text(
@@ -249,7 +254,7 @@ def _save_image_bytes(image_bytes: bytes) -> str:
     pil_image.save(output_path)
     return output_path
 
-
+'''
 def generate_image(state: FeedGenerationState) -> Dict[str, Any]:
     _log("이미지 생성")
 
@@ -333,6 +338,50 @@ def generate_image(state: FeedGenerationState) -> Dict[str, Any]:
         "error_message": f"image_generation failed: {error_summary}",
         "current_status": "image_generation_failed",
     }
+'''
+
+def generate_image(state: FeedGenerationState) -> Dict[str, Any]:
+    _log("이미지 생성 (무료 API 우회 중)")
+
+    generation_prompt = state.get("generation_prompt", "")
+    if not generation_prompt:
+        return {
+            "error_message": "generation_prompt가 비어 있습니다.",
+            "current_status": "image_generation_failed",
+        }
+
+    try:
+        # 1. 영어 프롬프트를 URL에 넣을 수 있도록 인코딩
+        encoded_prompt = urllib.parse.quote(generation_prompt)
+        
+        # 2. Pollinations.ai에 '그리지 말아야 할 것' 추가
+        negative_words = "cinematic, 3D render, over-polished, alien patterns, artificial, plastic, intricate carvings, dramatic lighting, studio setup"
+        encoded_negative = urllib.parse.quote(negative_words)
+        
+        # 2. Pollinations.ai 무료 API URL 구성 (가로세로 1024px, 로고 제거)
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
+        
+        # 3. API에 요청을 보내서 이미지 바이트 데이터 받아오기
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            image_bytes = response.read()
+
+        # 4. 사장님이 기존에 만들어둔 저장 함수를 그대로 호출하여 파일로 저장
+        saved_path = _save_image_bytes(image_bytes)
+
+        return {
+            "generated_image_url": saved_path,
+            "current_status": "generated_image_url created",
+        }
+
+    except Exception as e:
+        print(f"[!] 무료 이미지 API 실패: {str(e)}")
+        return {
+            "generated_image_url": "",
+            "error_message": f"image_generation failed: {str(e)}",
+            "current_status": "image_generation_failed",
+        }
+
 
 
 def generate_caption(state: FeedGenerationState) -> Dict[str, Any]:
@@ -340,14 +389,31 @@ def generate_caption(state: FeedGenerationState) -> Dict[str, Any]:
     try:
         client = get_gemini_client()
 
-        mood = state.get("mood", "")
+        mood     = state.get("mood", "")
         analysis = state.get("image_analysis", {})
+        user_text = (state.get("user_text") or "").strip()
+
+        # user_text 존재 여부에 따라 프롬프트 분기
+        if user_text:
+            user_text_instruction = (
+                f"\n\n[추가 정보 반영 규칙]\n"
+                f"사용자가 다음 추가 정보를 입력했습니다: \"{user_text}\"\n"
+                f"공방 무드와 이미지 감성을 유지하면서, "
+                f"위 내용(이벤트·공지·날짜 등)이 인스타그램 본문 카피 안에 자연스럽게 녹아들도록 작성하세요. "
+                f"광고처럼 딱딱하지 않고, 감성적인 흐름 속에 정보가 스며들어야 합니다."
+            )
+        else:
+            user_text_instruction = (
+                "\n\n[추가 정보 없음]\n"
+                "이미지와 무드 중심의 감성 문구만 작성하세요."
+            )
 
         prompt = (
             f"인스타그램에 바로 올릴 수 있는 친근하고 감성적인 한국어 캡션을 작성하세요.\n"
             f"요구사항: 2~3문장, 이모지 포함 (예: 🍯, 🏺, ✨), 따뜻하고 정갈한 톤.\n"
             f"무드: {mood}\n"
             f"이미지 상세: {json.dumps(analysis, ensure_ascii=False) if isinstance(analysis, dict) else str(analysis)}"
+            f"{user_text_instruction}"
         )
 
         response = _generate_text(
@@ -363,6 +429,7 @@ def generate_caption(state: FeedGenerationState) -> Dict[str, Any]:
         return {"caption": result.caption, "current_status": "caption generated"}
     except Exception as e:
         return {"error_message": f"caption_generation failed: {str(e)}", "current_status": "caption_failed"}
+
 
 
 def generate_hashtags(state: FeedGenerationState) -> Dict[str, Any]:
