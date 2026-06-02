@@ -472,6 +472,34 @@
 
     .no-img-placeholder span:first-child { font-size: 2rem; }
 
+    /* Image Download Button */
+    .btn-download {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      background: rgba(20, 16, 12, 0.75);
+      border: 1px solid var(--border-lit);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: all var(--ease);
+      display: none; /* 처음에는 숨겨둠 */
+      align-items: center;
+      gap: 0.4rem;
+      font-family: inherit;
+      z-index: 10;
+    }
+    
+    .btn-download:hover {
+      background: rgba(196, 112, 58, 0.2);
+      border-color: var(--accent);
+      color: var(--accent2);
+    }
+
     /* Right column */
     .result-right {
       display: flex;
@@ -783,6 +811,9 @@
           <span>🖼️</span>
           <span>이미지 생성에 실패했습니다</span>
         </div>
+        <button id="btnDownloadImg" class="btn-download" title="이미지 다운로드">
+          <span>⬇️</span> 다운로드
+        </button>
       </div>
 
       <!-- Caption + Hashtags -->
@@ -853,6 +884,7 @@
   const loadingSection = document.getElementById('loadingSection');
   const resultsSection = document.getElementById('resultsSection');
   const resultImg      = document.getElementById('resultImg');
+  const btnDownloadImg = document.getElementById('btnDownloadImg');
   const noImgPh        = document.getElementById('noImgPlaceholder');
   const captionEl      = document.getElementById('captionText');
   const hashtagChipsEl = document.getElementById('hashtagChips');
@@ -1024,12 +1056,21 @@
 
     // Generated image
     if (data.image_url) {
-      resultImg.onload = () => { resultImg.style.display = 'block'; noImgPh.style.display = 'none'; };
-      resultImg.onerror = () => { resultImg.style.display = 'none'; noImgPh.style.display = 'flex'; };
+      resultImg.onload = () => { 
+        resultImg.style.display = 'block'; 
+        noImgPh.style.display = 'none'; 
+        btnDownloadImg.style.display = 'flex';
+      };
+      resultImg.onerror = () => { 
+        resultImg.style.display = 'none'; 
+        noImgPh.style.display = 'flex'; 
+        btnDownloadImg.style.display = 'none';
+      };
       resultImg.src = data.image_url;
     } else {
       resultImg.style.display = 'none';
       noImgPh.style.display = 'flex';
+      btnDownloadImg.style.display = 'none';
     }
 
     resultsSection.classList.add('show');
@@ -1095,6 +1136,7 @@
     document.getElementById('userTextInput').value = '';
     captionStr = '';
     hashtagsArr = [];
+    btnDownloadImg.style.display = 'none';
     loadingSection.classList.remove('show');
     resultsSection.classList.remove('show');
     errorBox.classList.remove('show');
@@ -1102,6 +1144,40 @@
   }
 
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /* ── Download Image ── */
+  btnDownloadImg.addEventListener('click', async () => {
+    const url = resultImg.src;
+    if (!url) return;
+
+    try {
+      const originalHTML = btnDownloadImg.innerHTML;
+      btnDownloadImg.innerHTML = '<span>⏳</span> 다운로드 중...';
+      btnDownloadImg.style.pointerEvents = 'none';
+
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'pottery_feed.jpg';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+
+      btnDownloadImg.innerHTML = originalHTML;
+      btnDownloadImg.style.pointerEvents = 'auto';
+      showToast('이미지가 다운로드되었습니다!');
+
+    } catch (error) {
+      console.error('다운로드 실패:', error);
+      btnDownloadImg.innerHTML = '<span>⬇️</span> 다운로드';
+      btnDownloadImg.style.pointerEvents = 'auto';
+      showToast('다운로드 중 오류가 발생했습니다.');
+    }
+  });
 </script>
 </body>
 </html>
