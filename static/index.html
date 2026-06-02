@@ -617,6 +617,30 @@
     #toast.show { transform: translateX(-50%) translateY(0); }
     .toast-icon { color: var(--success); }
 
+    /* ── User Text Textarea ── */
+    .user-text-area {
+      width: 100%;
+      min-height: 90px;
+      background: rgba(255, 235, 210, 0.03);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      color: var(--text);
+      font-family: 'Noto Serif KR', serif;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      padding: 0.85rem 1rem;
+      resize: vertical;
+      transition: border-color var(--ease), background var(--ease);
+      outline: none;
+    }
+
+    .user-text-area::placeholder { color: var(--muted); }
+
+    .user-text-area:focus {
+      border-color: var(--accent);
+      background: rgba(196, 112, 58, 0.04);
+    }
+
     /* ── Responsive ── */
     @media (max-width: 600px) {
       header h1 { font-size: 1.55rem; }
@@ -678,6 +702,17 @@
         <p>고요하고 우아한 와비사비 미학</p>
       </div>
     </div>
+  </div>
+
+  <!-- ── 03 User Text ── -->
+  <div class="card">
+    <div class="section-label">03 — 추가 정보 (선택)</div>
+    <textarea
+      id="userTextInput"
+      class="user-text-area"
+      placeholder="공방 이벤트, 공지사항, 날짜 등 AI가 반영하길 원하는 내용을 입력해 주세요. (선택 사항)"
+      aria-label="추가 정보 입력"
+    ></textarea>
   </div>
 
   <!-- ── Generate Button ── -->
@@ -902,6 +937,7 @@
     const fd = new FormData();
     fd.append('image', selectedFile);
     fd.append('style', selectedStyle);
+    fd.append('user_text', document.getElementById('userTextInput').value.trim());
 
     try {
       const res = await fetch('/api/generate', { method: 'POST', body: fd });
@@ -913,6 +949,12 @@
 
       clearStepTimers();
       completeAllSteps();
+
+      if (data.error) {
+          console.error("Backend Error:", data.error);
+          errorBox.textContent = "AI 생성 지연: " + data.error;
+          errorBox.classList.add('show');
+      }
 
       await delay(500);
       showResults(data);
@@ -953,8 +995,8 @@
   function showResults(data) {
     loadingSection.classList.remove('show');
 
-    captionStr   = data.caption  || '';
-    hashtagsArr  = data.hashtags || [];
+    captionStr   = data.caption  || 'API 통신 오류로 인해 캡션을 생성하지 못했습니다. (상단의 빨간색 에러 로그를 확인해 주세요)';
+    hashtagsArr  = (data.hashtags && data.hashtags.length > 0) ? data.hashtags : ['#생성오류', '#확인필요'];
 
     // Mood
     if (data.mood) {
@@ -1050,6 +1092,7 @@
 
   function resetAll() {
     clearFile();
+    document.getElementById('userTextInput').value = '';
     captionStr = '';
     hashtagsArr = [];
     loadingSection.classList.remove('show');
