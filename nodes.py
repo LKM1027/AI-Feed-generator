@@ -85,30 +85,21 @@ def _call_with_retry(fn, max_retries: int = 3):
     raise last_exc
 
 
-# 텍스트 노드용 모델 우선순위 (독립적인 quota 버킷)
-TEXT_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"]
+# 텍스트 노드용 단일 모델 고정 (가장 가볍고 한도가 넉넉한 Lite 모델 적용)
+TEXT_MODEL = "gemini-2.5-flash-lite"
 
 
 def _generate_text(client, contents, config) -> Any:
-    """TEXT_MODELS 순서로 시도하는 텍스트 생성 헬퍼.
-    일일 한도 소진 시 다음 모델로 자동 전환.
-    """
-    last_exc: Exception = RuntimeError("모델 목록 비어있음")
-    for model in TEXT_MODELS:
-        try:
-            return _call_with_retry(
-                lambda m=model: client.models.generate_content(
-                    model=m, contents=contents, config=config
-                )
+    """단일 모델(gemini-2.5-flash-lite)을 사용하여 텍스트를 생성하는 헬퍼 함수."""
+    try:
+        return _call_with_retry(
+            lambda: client.models.generate_content(
+                model=TEXT_MODEL, contents=contents, config=config
             )
-        except Exception as e:
-            last_exc = e
-            err_str = str(e)
-            if "429" in err_str and "PerDay" in err_str:
-                print(f"[!] {model} 일일 한도 소진 → 다음 모델 시도...")
-                continue
-            raise  # 다른 오류는 즉시 raise
-    raise last_exc
+        )
+    except Exception as e:
+        print(f"[!] 텍스트 생성 API 호출 실패: {str(e)}")
+        raise e
 
 
 PRESETS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
@@ -359,7 +350,7 @@ def generate_image(state: FeedGenerationState) -> Dict[str, Any]:
         encoded_negative = urllib.parse.quote(negative_words)
         
         # 2. Pollinations.ai 무료 API URL 구성 (가로세로 1024px, 로고 제거)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1350&nologo=true&negative_prompt={encoded_negative}"
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1350&negative_prompt={encoded_negative}"
         
         # 3. API에 요청을 보내서 이미지 바이트 데이터 받아오기
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
