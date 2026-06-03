@@ -1089,20 +1089,25 @@
       hashtagChipsEl.appendChild(chip);
     });
 
-    // Generated image
+    const resultsTitle = document.querySelector('.results-title');
+
+    // Generated image & Title Handling
     if (data.image_url) {
+      resultsTitle.innerHTML = '✨ 생성 완료!';
       resultImg.onload = () => { 
         resultImg.style.display = 'block'; 
         noImgPh.style.display = 'none'; 
         btnDownloadImg.style.display = 'flex';
       };
       resultImg.onerror = () => { 
+        resultsTitle.innerHTML = '⚠️ 이미지 로드 실패';
         resultImg.style.display = 'none'; 
         noImgPh.style.display = 'flex'; 
         btnDownloadImg.style.display = 'none';
       };
       resultImg.src = data.image_url;
     } else {
+      resultsTitle.innerHTML = '⚠️ 이미지 생성 지연';
       resultImg.style.display = 'none';
       noImgPh.style.display = 'flex';
       btnDownloadImg.style.display = 'none';
