@@ -598,6 +598,38 @@
 
     .hashtags-footer { display: flex; justify-content: flex-end; }
 
+    /* Instagram Action Buttons */
+    .result-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      margin-top: 1.5rem;
+    }
+
+    .btn-insta {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+      border: none;
+      border-radius: var(--r);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--ease);
+      font-family: inherit;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn-insta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(220, 39, 67, 0.4);
+    }
+    
+    .btn-insta:active {
+      transform: scale(0.98);
+    }
+
     /* Regen button */
     .btn-regen {
       width: 100%;
@@ -848,7 +880,10 @@
     </div>
 
     <!-- Re-generate -->
-    <button class="btn-regen" id="btnRegen">🔄 &nbsp;새로운 피드 생성하기</button>
+    <div class="result-actions">
+      <button id="btnInstaUpload" class="btn-insta">📸 &nbsp;인스타그램에 바로 올리기</button>
+      <button class="btn-regen" id="btnRegen">🔄 &nbsp;새로운 피드 생성하기</button>
+    </div>
 
   </div><!-- /resultsSection -->
 
@@ -1178,6 +1213,32 @@
       showToast('다운로드 중 오류가 발생했습니다.');
     }
   });
+
+  /* ── Instagram Upload Automation ── */
+  const btnInstaUpload = document.getElementById('btnInstaUpload');
+  if (btnInstaUpload) {
+    btnInstaUpload.addEventListener('click', async () => {
+      // 1. 텍스트 병합 (캡션 + 해시태그)
+      const fullText = captionStr + '\n\n' + hashtagsArr.join(' ');
+      
+      try {
+        // 2. 클립보드에 전체 텍스트 복사
+        await copyText(fullText);
+        
+        // 3. 이미지 다운로드 트리거 (기존 다운로드 버튼 클릭 시뮬레이션)
+        btnDownloadImg.click();
+        
+        // 4. 사용자 안내 모달(Alert) 제공 (다운로드 시작을 위한 0.5초 대기)
+        setTimeout(() => {
+          alert("✨ 텍스트 복사 및 이미지 다운로드가 완료되었습니다!\n\n인스타그램 앱을 열고 다운로드된 이미지를 선택한 뒤, 내용 란에 '붙여넣기'만 하시면 됩니다.");
+        }, 500);
+        
+      } catch (error) {
+        console.error('인스타그램 업로드 준비 실패:', error);
+        alert('텍스트 복사 중 오류가 발생했습니다. 직접 복사 버튼을 이용해 주세요.');
+      }
+    });
+  }
 </script>
 </body>
 </html>
