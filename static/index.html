@@ -445,7 +445,7 @@
       border-radius: var(--r-lg);
       overflow: hidden;
       border: 1px solid var(--border);
-      aspect-ratio: 1 / 1;
+      aspect-ratio: 4 / 5;
       background: var(--bg2);
       position: relative;
     }
@@ -471,6 +471,34 @@
     }
 
     .no-img-placeholder span:first-child { font-size: 2rem; }
+
+    /* Image Download Button */
+    .btn-download {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      background: rgba(20, 16, 12, 0.75);
+      border: 1px solid var(--border-lit);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: all var(--ease);
+      display: none; /* 처음에는 숨겨둠 */
+      align-items: center;
+      gap: 0.4rem;
+      font-family: inherit;
+      z-index: 10;
+    }
+    
+    .btn-download:hover {
+      background: rgba(196, 112, 58, 0.2);
+      border-color: var(--accent);
+      color: var(--accent2);
+    }
 
     /* Right column */
     .result-right {
@@ -570,6 +598,38 @@
 
     .hashtags-footer { display: flex; justify-content: flex-end; }
 
+    /* Instagram Action Buttons */
+    .result-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+      margin-top: 1.5rem;
+    }
+
+    .btn-insta {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+      border: none;
+      border-radius: var(--r);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--ease);
+      font-family: inherit;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .btn-insta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(220, 39, 67, 0.4);
+    }
+    
+    .btn-insta:active {
+      transform: scale(0.98);
+    }
+
     /* Regen button */
     .btn-regen {
       width: 100%;
@@ -616,6 +676,30 @@
 
     #toast.show { transform: translateX(-50%) translateY(0); }
     .toast-icon { color: var(--success); }
+
+    /* ── User Text Textarea ── */
+    .user-text-area {
+      width: 100%;
+      min-height: 90px;
+      background: rgba(255, 235, 210, 0.03);
+      border: 1.5px solid var(--border);
+      border-radius: var(--r);
+      color: var(--text);
+      font-family: 'Noto Serif KR', serif;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      padding: 0.85rem 1rem;
+      resize: vertical;
+      transition: border-color var(--ease), background var(--ease);
+      outline: none;
+    }
+
+    .user-text-area::placeholder { color: var(--muted); }
+
+    .user-text-area:focus {
+      border-color: var(--accent);
+      background: rgba(196, 112, 58, 0.04);
+    }
 
     /* ── Responsive ── */
     @media (max-width: 600px) {
@@ -680,6 +764,17 @@
     </div>
   </div>
 
+  <!-- ── 03 User Text ── -->
+  <div class="card">
+    <div class="section-label">03 — 추가 정보 (선택)</div>
+    <textarea
+      id="userTextInput"
+      class="user-text-area"
+      placeholder="공방 이벤트, 공지사항, 날짜 등 AI가 반영하길 원하는 내용을 입력해 주세요. (선택 사항)"
+      aria-label="추가 정보 입력"
+    ></textarea>
+  </div>
+
   <!-- ── Generate Button ── -->
   <button id="btnGenerate" disabled aria-label="AI 피드 생성하기">
     ✨ &nbsp;AI 피드 생성하기
@@ -715,7 +810,7 @@
       </div>
       <div class="pipeline-step waiting" data-step="3">
         <span class="step-icon">🖼️</span>
-        <span class="step-name">Imagen 3 이미지 생성</span>
+        <span class="step-name">AI 이미지 생성</span>
         <span class="step-badge"></span>
       </div>
       <div class="pipeline-step waiting" data-step="4">
@@ -748,6 +843,9 @@
           <span>🖼️</span>
           <span>이미지 생성에 실패했습니다</span>
         </div>
+        <button id="btnDownloadImg" class="btn-download" title="이미지 다운로드">
+          <span>⬇️</span> 다운로드
+        </button>
       </div>
 
       <!-- Caption + Hashtags -->
@@ -782,7 +880,10 @@
     </div>
 
     <!-- Re-generate -->
-    <button class="btn-regen" id="btnRegen">🔄 &nbsp;새로운 피드 생성하기</button>
+    <div class="result-actions">
+      <button id="btnInstaUpload" class="btn-insta"> &nbsp;인스타그램에 바로 올리기</button>
+      <button class="btn-regen" id="btnRegen">🔄 &nbsp;새로운 피드 생성하기</button>
+    </div>
 
   </div><!-- /resultsSection -->
 
@@ -818,6 +919,7 @@
   const loadingSection = document.getElementById('loadingSection');
   const resultsSection = document.getElementById('resultsSection');
   const resultImg      = document.getElementById('resultImg');
+  const btnDownloadImg = document.getElementById('btnDownloadImg');
   const noImgPh        = document.getElementById('noImgPlaceholder');
   const captionEl      = document.getElementById('captionText');
   const hashtagChipsEl = document.getElementById('hashtagChips');
@@ -902,6 +1004,7 @@
     const fd = new FormData();
     fd.append('image', selectedFile);
     fd.append('style', selectedStyle);
+    fd.append('user_text', document.getElementById('userTextInput').value.trim());
 
     try {
       const res = await fetch('/api/generate', { method: 'POST', body: fd });
@@ -913,6 +1016,12 @@
 
       clearStepTimers();
       completeAllSteps();
+
+      if (data.error) {
+          console.error("Backend Error:", data.error);
+          errorBox.textContent = "AI 생성 지연: " + data.error;
+          errorBox.classList.add('show');
+      }
 
       await delay(500);
       showResults(data);
@@ -953,8 +1062,8 @@
   function showResults(data) {
     loadingSection.classList.remove('show');
 
-    captionStr   = data.caption  || '';
-    hashtagsArr  = data.hashtags || [];
+    captionStr   = data.caption  || 'API 통신 오류로 인해 캡션을 생성하지 못했습니다. (상단의 빨간색 에러 로그를 확인해 주세요)';
+    hashtagsArr  = (data.hashtags && data.hashtags.length > 0) ? data.hashtags : ['#생성오류', '#확인필요'];
 
     // Mood
     if (data.mood) {
@@ -980,14 +1089,28 @@
       hashtagChipsEl.appendChild(chip);
     });
 
-    // Generated image
+    const resultsTitle = document.querySelector('.results-title');
+
+    // Generated image & Title Handling
     if (data.image_url) {
-      resultImg.onload = () => { resultImg.style.display = 'block'; noImgPh.style.display = 'none'; };
-      resultImg.onerror = () => { resultImg.style.display = 'none'; noImgPh.style.display = 'flex'; };
+      resultsTitle.innerHTML = '✨ 생성 완료!';
+      resultImg.onload = () => { 
+        resultImg.style.display = 'block'; 
+        noImgPh.style.display = 'none'; 
+        btnDownloadImg.style.display = 'flex';
+      };
+      resultImg.onerror = () => { 
+        resultsTitle.innerHTML = '⚠️ 이미지 로드 실패';
+        resultImg.style.display = 'none'; 
+        noImgPh.style.display = 'flex'; 
+        btnDownloadImg.style.display = 'none';
+      };
       resultImg.src = data.image_url;
     } else {
+      resultsTitle.innerHTML = '⚠️ 이미지 생성 지연';
       resultImg.style.display = 'none';
       noImgPh.style.display = 'flex';
+      btnDownloadImg.style.display = 'none';
     }
 
     resultsSection.classList.add('show');
@@ -1050,8 +1173,10 @@
 
   function resetAll() {
     clearFile();
+    document.getElementById('userTextInput').value = '';
     captionStr = '';
     hashtagsArr = [];
+    btnDownloadImg.style.display = 'none';
     loadingSection.classList.remove('show');
     resultsSection.classList.remove('show');
     errorBox.classList.remove('show');
@@ -1059,6 +1184,66 @@
   }
 
   function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  /* ── Download Image ── */
+  btnDownloadImg.addEventListener('click', async () => {
+    const url = resultImg.src;
+    if (!url) return;
+
+    try {
+      const originalHTML = btnDownloadImg.innerHTML;
+      btnDownloadImg.innerHTML = '<span>⏳</span> 다운로드 중...';
+      btnDownloadImg.style.pointerEvents = 'none';
+
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'pottery_feed.jpg';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+
+      btnDownloadImg.innerHTML = originalHTML;
+      btnDownloadImg.style.pointerEvents = 'auto';
+      showToast('이미지가 다운로드되었습니다!');
+
+    } catch (error) {
+      console.error('다운로드 실패:', error);
+      btnDownloadImg.innerHTML = '<span>⬇️</span> 다운로드';
+      btnDownloadImg.style.pointerEvents = 'auto';
+      showToast('다운로드 중 오류가 발생했습니다.');
+    }
+  });
+
+  /* ── Instagram Upload Automation ── */
+  const btnInstaUpload = document.getElementById('btnInstaUpload');
+  if (btnInstaUpload) {
+    btnInstaUpload.addEventListener('click', async () => {
+      // 1. 텍스트 병합 (캡션 + 해시태그)
+      const fullText = captionStr + '\n\n' + hashtagsArr.join(' ');
+      
+      try {
+        // 2. 클립보드에 전체 텍스트 복사
+        await copyText(fullText);
+        
+        // 3. 이미지 다운로드 트리거 (기존 다운로드 버튼 클릭 시뮬레이션)
+        btnDownloadImg.click();
+        
+        // 4. 사용자 안내 모달(Alert) 제공 (다운로드 시작을 위한 0.5초 대기)
+        setTimeout(() => {
+          alert("✨ 텍스트 복사 및 이미지 다운로드가 완료되었습니다!\n\n인스타그램 앱을 열고 다운로드된 이미지를 선택한 뒤, 내용 란에 '붙여넣기'만 하시면 됩니다.");
+        }, 500);
+        
+      } catch (error) {
+        console.error('인스타그램 업로드 준비 실패:', error);
+        alert('텍스트 복사 중 오류가 발생했습니다. 직접 복사 버튼을 이용해 주세요.');
+      }
+    });
+  }
 </script>
 </body>
 </html>

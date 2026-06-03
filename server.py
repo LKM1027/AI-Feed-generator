@@ -3,7 +3,7 @@ import shutil
 import tempfile
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -35,6 +35,7 @@ async def root():
 async def generate_feed(
     image: UploadFile = File(...),
     style: str = Form("warm"),
+    user_text: str = Form(""),
 ):
     suffix = os.path.splitext(image.filename or "upload.jpg")[1] or ".jpg"
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=suffix)
@@ -45,6 +46,7 @@ async def generate_feed(
         initial_state: FeedGenerationState = {
             "original_image_path": tmp_path,
             "selected_style": style,
+            "user_text": user_text.strip() if user_text else None,
             "image_analysis": {},
             "mood": "",
             "generation_prompt": "",
