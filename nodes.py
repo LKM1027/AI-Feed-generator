@@ -9,8 +9,9 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from PIL import Image
 
-import urllib.request
-import urllib.parse
+import os
+import requests
+from typing import Dict, Any
 
 from state import FeedGenerationState
 
@@ -58,10 +59,10 @@ def _log(step: str) -> None:
     print(f"[*] {step} 진행 중...")
 
 
-def _call_with_retry(fn, max_retries: int = 3):
-    """429 Rate Limit 발생 시 자동 재시도.
-    - 일일 한도(PerDay) 소진 시는 즉시 raise(재시도 소용없음)
-    - 분당 한도(PerMinute) 시는 API 권장 대기 후 재시도
+def _call_with_retry(fn, max_retries: int = 2):
+    """429 Rate Limit 발생 시 자동 재시도 (최대 2회 시도).
+    - 일일 한도(PerDay) 소진 시는 즉시 raise (요금/크레딧 보호)
+    - 분당 한도(PerMinute) 시는 API 권장 대기 후 1번 더 재시도
     """
     last_exc = None
     for attempt in range(max_retries):
@@ -245,134 +246,78 @@ def _save_image_bytes(image_bytes: bytes) -> str:
     pil_image.save(output_path)
     return output_path
 
-'''
-def generate_image(state: FeedGenerationState) -> Dict[str, Any]:
-    _log("이미지 생성")
-
-    generation_prompt = state.get("generation_prompt", "")
-    if not generation_prompt:
-        return {
-            "error_message": "generation_prompt가 비어 있습니다.",
-            "current_status": "image_generation_failed",
-        }
-
-    client = get_gemini_client()
-    errors: List[str] = []
-
-    # ── 시도 1: gemini-2.5-flash-image (generateContent + IMAGE modality) ──
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-image",
-            contents=generation_prompt,
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-            ),
-        )
-        for part in response.candidates[0].content.parts:
-            if part.inline_data is not None:
-                return {
-                    "generated_image_url": _save_image_bytes(part.inline_data.data),
-                    "current_status": "generated_image_url created",
-                }
-        errors.append("gemini-2.5-flash-image: 이미지 파트 없음")
-    except Exception as e:
-        errors.append(f"gemini-2.5-flash-image: {e}")
-        print(f"[!] gemini-2.5-flash-image 실패 → 다음 모델 시도")
-
-    # ── 시도 2: gemini-3.1-flash-image (generateContent + IMAGE modality) ──
-    try:
-        response = client.models.generate_content(
-            model="gemini-3.1-flash-image",
-            contents=generation_prompt,
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-            ),
-        )
-        for part in response.candidates[0].content.parts:
-            if part.inline_data is not None:
-                return {
-                    "generated_image_url": _save_image_bytes(part.inline_data.data),
-                    "current_status": "generated_image_url created",
-                }
-        errors.append("gemini-3.1-flash-image: 이미지 파트 없음")
-    except Exception as e:
-        errors.append(f"gemini-3.1-flash-image: {e}")
-        print(f"[!] gemini-3.1-flash-image 실패 → 다음 모델 시도")
-
-    # ── 시도 3: imagen-4.0-fast-generate-001 (generate_images, 유료 전용) ──
-    try:
-        response = client.models.generate_images(
-            model="imagen-4.0-fast-generate-001",
-            prompt=generation_prompt,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="1:1",
-            ),
-        )
-        if response.generated_images:
-            return {
-                "generated_image_url": _save_image_bytes(
-                    response.generated_images[0].image.image_bytes
-                ),
-                "current_status": "generated_image_url created",
-            }
-        errors.append("imagen-4.0-fast-generate-001: 이미지 없음")
-    except Exception as e:
-        errors.append(f"imagen-4.0-fast-generate-001: {e}")
-        print(f"[!] imagen-4.0-fast-generate-001 실패")
-
-    # ── 전체 실패 → 파이프라인 계속 진행 (크래시 방지) ──
-    error_summary = " | ".join(errors)
-    print(f"[!] 이미지 생성 전체 실패: {error_summary}")
-    return {
-        "generated_image_url": "",
-        "error_message": f"image_generation failed: {error_summary}",
-        "current_status": "image_generation_failed",
-    }
-'''
 
 def generate_image(state: FeedGenerationState) -> Dict[str, Any]:
-    _log("이미지 생성 (무료 API 우회 중)")
+    _log("Clipdrop API를 이용한 배경 합성 (원본 도자기 유지)")
 
-    generation_prompt = state.get("generation_prompt", "")
-    if not generation_prompt:
-        return {
-            "error_message": "generation_prompt가 비어 있습니다.",
-            "current_status": "image_generation_failed",
-        }
-
-    try:
-        # 1. 영어 프롬프트를 URL에 넣을 수 있도록 인코딩
-        encoded_prompt = urllib.parse.quote(generation_prompt)
-        
-        # 2. Pollinations.ai에 '그리지 말아야 할 것' 추가
-        negative_words = "cinematic, 3D render, over-polished, alien patterns, artificial, plastic, intricate carvings, dramatic lighting, studio setup"
-        encoded_negative = urllib.parse.quote(negative_words)
-        
-        # 2. Pollinations.ai 무료 API URL 구성 (가로세로 1024px, 로고 제거)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1350&negative_prompt={encoded_negative}"
-        
-        # 3. API에 요청을 보내서 이미지 바이트 데이터 받아오기
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
-            image_bytes = response.read()
-
-        # 4. 사장님이 기존에 만들어둔 저장 함수를 그대로 호출하여 파일로 저장
-        saved_path = _save_image_bytes(image_bytes)
-
-        return {
-            "generated_image_url": saved_path,
-            "current_status": "generated_image_url created",
-        }
-
-    except Exception as e:
-        print(f"[!] 무료 이미지 API 실패: {str(e)}")
+    # 1. 프롬프트 및 원본 이미지 경로 검증
+    bg_prompt = state.get("generation_prompt", "") 
+    img_path = state.get("original_image_path")
+    
+    if not bg_prompt:
         return {
             "generated_image_url": "",
-            "error_message": f"image_generation failed: {str(e)}",
+            "error_message": "generation_prompt가 비어 있습니다.",
+            "current_status": "image_generation_failed",
+        }
+        
+    if not img_path or not os.path.exists(img_path):
+        return {
+            "generated_image_url": "",
+            "error_message": f"원본 이미지 경로가 유효하지 않습니다: {img_path}",
             "current_status": "image_generation_failed",
         }
 
+    # 2. 환경 변수에서 API 키 로드
+    api_key = os.getenv("CLIPDROP_API_KEY")
+    if not api_key:
+        return {
+            "generated_image_url": "",
+            "error_message": "CLIPDROP_API_KEY 환경변수가 설정되지 않았습니다.",
+            "current_status": "image_generation_failed",
+        }
+
+    # 3. Clipdrop Replace Background API 호출
+    try:
+        with open(img_path, 'rb') as f:
+            files = {'image_file': (os.path.basename(img_path), f, 'image/jpeg')}
+            data = {'prompt': bg_prompt}
+            headers = {'x-api-key': api_key}
+            
+            _log(f"Clipdrop 요청 송신 중... 프롬프트: {bg_prompt[:30]}...")
+            r = requests.post(
+                'https://clipdrop-api.co/replace-background/v1',
+                files=files,
+                data=data,
+                headers=headers,
+                timeout=45  # 발표 대기 시간을 위한 타임아웃 설정
+            )
+        
+        # 4. 응답 처리 및 상태 반영
+        if r.ok:
+            saved_path = _save_image_bytes(r.content)
+            _log(f"Clipdrop 배경 합성 성공: {saved_path}")
+            
+            return {
+                "generated_image_url": saved_path,
+                "error_message": "",
+                "current_status": "generated_image_url created", # 기존 파이프라인 상태 규격 유지
+            }
+        else:
+            print(f"[!] Clipdrop API 오류: {r.status_code} - {r.text}")
+            return {
+                "generated_image_url": "",
+                "error_message": f"Clipdrop API error ({r.status_code}): {r.text}",
+                "current_status": "image_generation_failed",
+            }
+            
+    except Exception as e:
+        print(f"[!] Clipdrop 연동 실패 예외 발생: {str(e)}")
+        return {
+            "generated_image_url": "",
+            "error_message": f"Clipdrop integration failed: {str(e)}",
+            "current_status": "image_generation_failed",
+        }
 
 
 def generate_caption(state: FeedGenerationState) -> Dict[str, Any]:
