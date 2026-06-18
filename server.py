@@ -22,6 +22,7 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 
 app = FastAPI(title="도자기 인스타그램 피드 생성기 API")
 
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 # 생성된 이미지 파일 서빙
 app.mount("/output", StaticFiles(directory=OUTPUT_DIR), name="output")
 
