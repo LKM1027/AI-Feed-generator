@@ -3,954 +3,608 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🏺 도자기 인스타 피드 생성기 — AI 콘텐츠 도우미</title>
-  <meta name="description" content="도자기 공방 사진을 AI가 분석하여 인스타그램 피드용 이미지, 캡션, 해시태그를 자동 생성합니다." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <title>향기도예 — 인스타 피드 생성기</title>
+  <meta name="description" content="사진 한 장으로 AI가 감성적인 이미지, 캡션, 해시태그를 모두 만들어 드립니다." />
   <style>
+    /* Reset & Globals */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:       #0c0a09;
-      --bg2:      #161210;
-      --surface:  rgba(255, 235, 210, 0.045);
-      --surf-hov: rgba(255, 235, 210, 0.08);
-      --border:   rgba(196, 112, 58, 0.18);
-      --border-lit: rgba(232, 149, 109, 0.45);
-      --accent:   #c4703a;
-      --accent2:  #e8956d;
-      --text:     #f0e4d0;
-      --muted:    #7a6555;
-      --dim:      #3a2820;
-      --success:  #6db88e;
-      --error:    #e06060;
-      --r:        14px;
-      --r-lg:     22px;
-      --r-sm:     9px;
-      --ease:     0.32s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* ── Animated background glow ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 70% 50% at 12% 18%, rgba(196, 112, 58, 0.09) 0%, transparent 55%),
-        radial-gradient(ellipse 55% 38% at 88% 82%, rgba(139, 69, 19, 0.07) 0%, transparent 50%),
-        radial-gradient(ellipse 90% 70% at 50% -10%, rgba(232, 149, 109, 0.04) 0%, transparent 60%);
-      pointer-events: none;
-      z-index: 0;
-      animation: bgPulse 9s ease-in-out infinite;
-    }
-
-    @keyframes bgPulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.6; }
-    }
-
-    /* ── Layout ── */
-    .container {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 0 1.5rem 5rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* ── Header ── */
-    header {
-      text-align: center;
-      padding: 3.5rem 0 2.5rem;
-    }
-
-    .logo-wrap {
-      display: inline-flex;
-      align-items: center;
+    html, body {
+      margin: 0px;
+      min-height: 100%;
+      background-color: #201d1a;
+      display: flex;
       justify-content: center;
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(196,112,58,0.18) 0%, transparent 70%);
-      border: 1px solid var(--border-lit);
-      font-size: 2.1rem;
-      margin-bottom: 1.1rem;
-      animation: float 5s ease-in-out infinite;
+      -webkit-font-smoothing: antialiased;
+    /* 브라우저 기본 스크롤바 숨기기 (기능은 작동하되 눈에만 안 보임) */
+      -ms-overflow-style: none; /* 인터넷 익스플로러, 엣지 */
+      scrollbar-width: none; /* 파이어폭스 */
     }
 
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50%       { transform: translateY(-7px); }
-    }
-
-    header h1 {
-      font-family: 'Noto Serif KR', serif;
-      font-size: 2rem;
-      font-weight: 600;
-      background: linear-gradient(140deg, var(--text) 0%, var(--accent2) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 0.55rem;
-    }
-
-    header p {
-      color: var(--muted);
-      font-size: 0.92rem;
-      font-weight: 300;
-      line-height: 1.6;
-    }
-
-    /* ── Card ── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      padding: 1.6rem 1.75rem;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      transition: border-color var(--ease);
-      margin-bottom: 1.1rem;
-    }
-
-    .section-label {
-      font-size: 0.7rem;
-      letter-spacing: 0.13em;
-      text-transform: uppercase;
-      color: var(--accent2);
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-
-    /* ── Upload ── */
-    .drop-zone {
-      border: 1.5px dashed var(--border-lit);
-      border-radius: var(--r);
-      padding: 2.75rem 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all var(--ease);
-      position: relative;
-    }
-
-    .drop-zone:hover, .drop-zone.drag-over {
-      border-color: var(--accent);
-      background: rgba(196, 112, 58, 0.05);
-    }
-
-    .drop-zone.drag-over { transform: scale(1.01); }
-
-    .drop-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
-    }
-
-    .drop-icon { font-size: 2.2rem; display: block; margin-bottom: 0.65rem; }
-
-    .drop-zone .drop-main {
-      color: var(--text);
-      font-size: 0.92rem;
-      font-weight: 500;
-      margin-bottom: 0.3rem;
-    }
-
-    .drop-zone .drop-hint {
-      color: var(--muted);
-      font-size: 0.78rem;
-    }
-
-    .preview-area {
+    /* 크롬, 사파리, 오페라, 브레이브 브라우저용 스크롤바 숨기기 */
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
       display: none;
-      align-items: center;
-      gap: 1.1rem;
     }
 
-    .preview-area.show { display: flex; }
+    button:focus-visible {
+      outline: 2px solid #4a90e2 !important;
+      outline: -webkit-focus-ring-color auto 5px !important;
+    }
+    a { text-decoration: none; }
 
-    .preview-thumb {
-      width: 72px;
-      height: 72px;
-      border-radius: var(--r-sm);
-      object-fit: cover;
-      border: 1.5px solid var(--border-lit);
-      flex-shrink: 0;
+    @font-face {
+      font-family: "Pretendard Variable-Regular";
+      src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
     }
 
-    .preview-info { flex: 1; min-width: 0; }
+    /* Screen Container (Figma base) */
+    .screen {
+      position: relative;
+      width: 402px;
+      min-height: 100vh;
+      background-color: #201d1a;
+      overflow-x: hidden;
+      padding-bottom: 100px; /* 여유 공간 */
+    }
 
-    .preview-name {
-      font-size: 0.88rem;
-      font-weight: 500;
+    /* Header & Logo */
+    .subtract {
+      position: absolute;
+      top: 66px;
+      left: 20px;
+      width: 67px;
+      height: 24px;
+    }
+    
+    .text-wrapper-4 {
+      position: absolute;
+      top: 148px;
+      left: calc(50.00% - 102px);
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 700;
+      color: #f3efe5;
+      font-size: 20px;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-bottom: 0.2rem;
-    }
-
-    .preview-size { font-size: 0.78rem; color: var(--muted); }
-
-    .btn-reset {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      color: var(--muted);
-      padding: 0.38rem 0.85rem;
-      font-size: 0.78rem;
-      cursor: pointer;
-      transition: all var(--ease);
-      flex-shrink: 0;
-      font-family: inherit;
-    }
-
-    .btn-reset:hover { border-color: var(--accent); color: var(--accent2); }
-
-    /* ── Style Cards ── */
-    .style-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.75rem;
-    }
-
-    .style-option {
-      border: 1.5px solid var(--border);
-      border-radius: var(--r);
-      padding: 1.1rem 0.85rem 1rem;
       text-align: center;
-      cursor: pointer;
-      transition: all var(--ease);
-      position: relative;
-      overflow: hidden;
-      user-select: none;
     }
 
-    .style-option::before {
-      content: '';
+    .AI {
       position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity var(--ease);
-      border-radius: inherit;
-    }
-
-    .style-option[data-style="warm"]::before     { background: radial-gradient(ellipse at top, rgba(196,112,58,0.14), transparent 70%); }
-    .style-option[data-style="minimal"]::before  { background: radial-gradient(ellipse at top, rgba(220,215,205,0.09), transparent 70%); }
-    .style-option[data-style="japanese"]::before { background: radial-gradient(ellipse at top, rgba(100,155,130,0.1), transparent 70%); }
-
-    .style-option:hover::before,
-    .style-option.active::before { opacity: 1; }
-
-    .style-option.active {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent), 0 6px 28px rgba(196,112,58,0.18);
-    }
-
-    .style-option:hover:not(.active) { border-color: rgba(196,112,58,0.45); }
-
-    .style-emoji { font-size: 1.65rem; display: block; margin-bottom: 0.45rem; }
-
-    .style-option h3 {
-      font-family: 'Noto Serif KR', serif;
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 0.28rem;
-    }
-
-    .style-option p { font-size: 0.73rem; color: var(--muted); line-height: 1.45; }
-
-    /* ── Generate Button ── */
-    #btnGenerate {
-      width: 100%;
-      padding: 1rem 2rem;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-      border: none;
-      border-radius: var(--r);
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all var(--ease);
-      margin-bottom: 1.1rem;
-      letter-spacing: 0.025em;
-      position: relative;
-      overflow: hidden;
-      font-family: inherit;
-    }
-
-    #btnGenerate::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(255,255,255,0);
-      transition: background var(--ease);
-    }
-
-    #btnGenerate:hover:not(:disabled)::after { background: rgba(255,255,255,0.09); }
-    #btnGenerate:active:not(:disabled) { transform: scale(0.99); }
-    #btnGenerate:disabled { opacity: 0.38; cursor: not-allowed; }
-
-    /* ── Error Box ── */
-    .error-box {
-      display: none;
-      background: rgba(224,96,96,0.08);
-      border: 1px solid rgba(224,96,96,0.28);
-      border-radius: var(--r);
-      padding: 0.9rem 1.1rem;
-      font-size: 0.85rem;
-      color: var(--error);
-      margin-bottom: 1.1rem;
-    }
-
-    .error-box.show { display: block; animation: fadeUp 0.3s ease; }
-
-    /* ── Loading ── */
-    #loadingSection { display: none; }
-    #loadingSection.show { display: block; animation: fadeUp 0.4s ease; }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .loading-header {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin-bottom: 1.4rem;
-    }
-
-    .spinner {
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      border: 2.5px solid var(--dim);
-      border-top-color: var(--accent);
-      animation: spin 0.85s linear infinite;
-      flex-shrink: 0;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .loading-title {
-      font-family: 'Noto Serif KR', serif;
-      font-size: 1.05rem;
-      font-weight: 600;
-    }
-
-    .loading-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.18rem; }
-
-    .pipeline-steps { display: flex; flex-direction: column; gap: 0.5rem; }
-
-    .pipeline-step {
-      display: flex;
-      align-items: center;
-      gap: 0.85rem;
-      padding: 0.65rem 0.9rem;
-      border-radius: var(--r-sm);
-      border: 1px solid transparent;
-      transition: all 0.45s ease;
-    }
-
-    .step-icon { font-size: 1rem; flex-shrink: 0; width: 1.4rem; text-align: center; }
-    .step-name { font-size: 0.84rem; color: var(--muted); flex: 1; transition: color 0.4s; }
-    .step-badge {
-      font-size: 0.68rem;
-      padding: 0.18rem 0.55rem;
-      border-radius: 20px;
-      font-weight: 500;
-      opacity: 0;
-      transition: opacity 0.4s;
-    }
-
-    /* waiting */
-    .pipeline-step.waiting .step-badge { opacity: 0; }
-
-    /* active */
-    .pipeline-step.active {
-      background: rgba(196,112,58,0.07);
-      border-color: var(--border);
-    }
-    .pipeline-step.active .step-name { color: var(--text); }
-    .pipeline-step.active .step-badge {
-      opacity: 1;
-      background: rgba(196,112,58,0.18);
-      color: var(--accent2);
-    }
-    .pipeline-step.active .step-badge::after { content: '진행 중'; }
-
-    /* done */
-    .pipeline-step.done .step-name { color: var(--muted); }
-    .pipeline-step.done .step-badge {
-      opacity: 1;
-      background: rgba(109,184,142,0.12);
-      color: var(--success);
-    }
-    .pipeline-step.done .step-badge::after { content: '완료 ✓'; }
-
-    /* ── Results ── */
-    #resultsSection { display: none; }
-    #resultsSection.show { display: block; animation: fadeUp 0.55s ease; }
-
-    .results-header {
+      top: 189px;
+      left: calc(50.00% - 133px);
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 400;
+      color: #ccbc9f;
+      font-size: 10px;
       text-align: center;
-      margin-bottom: 1.4rem;
+      line-height: 1.4;
+      width: 266px;
     }
 
-    .results-title {
-      font-family: 'Noto Serif KR', serif;
-      font-size: 1.4rem;
+    /* Section Labels */
+    .div {
+      position: absolute;
+      top: 287px;
+      left: 20px;
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
       font-weight: 600;
-      background: linear-gradient(135deg, var(--text), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 0.35rem;
+      color: #f3efe5;
+      font-size: 12px;
+    }
+    .text-wrapper-2 {
+      position: absolute;
+      top: 525px;
+      left: 23px;
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #f3efe5;
+      font-size: 12px;
+    }
+    .text-wrapper-3 {
+      position: absolute;
+      top: 715px;
+      left: 22px;
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #f3efe5;
+      font-size: 12px;
     }
 
-    .mood-badge {
-      display: inline-block;
-      background: rgba(196,112,58,0.12);
-      border: 1px solid rgba(196,112,58,0.25);
-      border-radius: 20px;
-      padding: 0.28rem 0.9rem;
-      font-size: 0.78rem;
-      color: var(--accent2);
-      font-style: italic;
-    }
-
-    .results-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.1rem;
-      margin-bottom: 1.1rem;
-    }
-
-    /* Generated Image */
-    .result-img-wrap {
-      border-radius: var(--r-lg);
-      overflow: hidden;
-      border: 1px solid var(--border);
-      aspect-ratio: 4 / 5;
-      background: var(--bg2);
-      position: relative;
-    }
-
-    .result-img-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: none;
-      transition: opacity 0.5s ease;
-    }
-
-    .no-img-placeholder {
-      width: 100%;
-      height: 100%;
+    /* 01 Upload Zone */
+    .group { /* drop zone bg */
+      position: absolute;
+      top: 318px;
+      left: calc(50.00% - 181px);
+      width: 362px;
+      height: 162px;
+      background-color: #ebe4d6;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px #fffffa80;
+      cursor: pointer;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: var(--muted);
-      font-size: 0.82rem;
-      gap: 0.5rem;
-    }
-
-    .no-img-placeholder span:first-child { font-size: 2rem; }
-
-    /* Image Download Button */
-    .btn-download {
-      position: absolute;
-      bottom: 1rem;
-      right: 1rem;
-      background: rgba(20, 16, 12, 0.75);
-      border: 1px solid var(--border-lit);
-      border-radius: var(--r-sm);
-      color: var(--text);
-      padding: 0.4rem 0.8rem;
-      font-size: 0.78rem;
-      cursor: pointer;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      transition: all var(--ease);
-      display: none; /* 처음에는 숨겨둠 */
-      align-items: center;
-      gap: 0.4rem;
-      font-family: inherit;
+      overflow: hidden;
       z-index: 10;
     }
-    
-    .btn-download:hover {
-      background: rgba(196, 112, 58, 0.2);
-      border-color: var(--accent);
-      color: var(--accent2);
+    .group input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; z-index: 20;
+    }
+    .text-wrapper-5 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 400;
+      color: #000000;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .p {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 500;
+      color: #a09279;
+      font-size: 8px;
     }
 
-    /* Right column */
-    .result-right {
-      display: flex;
-      flex-direction: column;
-      gap: 0.9rem;
-    }
-
-    /* Caption & Hashtags cards */
-    .result-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      padding: 1.1rem 1.2rem;
-      flex: 1;
-    }
-
-    .result-card-header {
-      display: flex;
+    /* Preview State overlay inside .group */
+    #previewArea {
+      position: absolute;
+      inset: 0;
+      background-color: #ebe4d6;
+      display: none;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.75rem;
+      padding: 16px;
+      gap: 12px;
+      z-index: 15;
     }
+    #previewArea.show { display: flex; }
+    .preview-thumb { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
+    .preview-info { flex: 1; color: #534131; }
+    .preview-name { font-size: 13px; font-weight: 600; font-family: sans-serif; }
+    .btn-reset { z-index: 30; background: transparent; border: 1px solid #a09279; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; }
 
-    .card-label {
-      font-size: 0.68rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent2);
-      font-weight: 600;
-    }
-
-    .btn-copy {
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-      background: var(--surf-hov);
-      border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      color: var(--muted);
-      padding: 0.28rem 0.7rem;
-      font-size: 0.74rem;
+    /* 02 Style Selection */
+    .style-opt-btn {
+      position: absolute;
+      top: 556px;
+      width: 114px;
+      height: 114px;
+      background-color: #ebe4d6;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px #fffffa80;
       cursor: pointer;
-      transition: all var(--ease);
-      font-family: inherit;
-      flex-shrink: 0;
+      border: 2px solid transparent;
+      z-index: 10;
     }
-
-    .btn-copy:hover {
-      border-color: var(--accent);
-      color: var(--accent2);
-      background: rgba(196,112,58,0.07);
-    }
-
-    .btn-copy.copied {
-      border-color: var(--success);
-      color: var(--success);
-      background: rgba(109,184,142,0.08);
-    }
-
-    .caption-text {
-      font-family: 'Noto Serif KR', serif;
-      font-size: 0.88rem;
-      line-height: 1.8;
-      color: var(--text);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    /* Hashtag chips */
-    .hashtag-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .chip {
-      background: rgba(196,112,58,0.09);
-      border: 1px solid rgba(196,112,58,0.22);
-      border-radius: 20px;
-      padding: 0.3rem 0.85rem;
-      font-size: 0.78rem;
-      color: var(--accent2);
-      cursor: pointer;
-      transition: all var(--ease);
-      user-select: none;
-    }
-
-    .chip:hover {
-      background: rgba(196,112,58,0.18);
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .chip:active { transform: scale(0.96); }
-
-    .hashtags-footer { display: flex; justify-content: flex-end; }
-
-    /* Instagram Action Buttons */
-    .result-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 0.8rem;
-      margin-top: 1.5rem;
-    }
-
-    .btn-insta {
-      width: 100%;
-      padding: 1rem;
-      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-      border: none;
-      border-radius: var(--r);
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all var(--ease);
-      font-family: inherit;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    }
+    .style-opt-btn.active { border-color: #ffffff; background-color: #ffffff; }
     
-    .btn-insta:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(220, 39, 67, 0.4);
-    }
-    
-    .btn-insta:active {
-      transform: scale(0.98);
-    }
+    .group-5 { left: calc(50.00% - 181px); } /* warm */
+    .group-6 { left: calc(50.00% - 57px); }  /* minimal */
+    .group-7 { left: calc(50.00% + 67px); }  /* japanese */
 
-    /* Regen button */
-    .btn-regen {
-      width: 100%;
-      padding: 0.85rem;
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      color: var(--muted);
-      font-size: 0.88rem;
-      cursor: pointer;
-      transition: all var(--ease);
-      font-family: inherit;
-    }
-
-    .btn-regen:hover {
-      border-color: var(--accent);
-      color: var(--accent2);
-      background: rgba(196,112,58,0.04);
-    }
-
-    /* ── Toast ── */
-    #toast {
-      position: fixed;
-      bottom: 2rem;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: rgba(20,16,12,0.95);
-      border: 1px solid var(--border-lit);
-      border-radius: var(--r-sm);
-      padding: 0.7rem 1.4rem;
-      font-size: 0.84rem;
-      color: var(--text);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-      z-index: 999;
+    .style-title {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #000000;
+      font-size: 12px;
       pointer-events: none;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      white-space: nowrap;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .style-desc {
+      position: absolute;
+      top: 35px;
+      left: 10px;
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 400;
+      color: #000000;
+      font-size: 10px;
+      pointer-events: none;
     }
 
-    #toast.show { transform: translateX(-50%) translateY(0); }
-    .toast-icon { color: var(--success); }
-
-    /* ── User Text Textarea ── */
-    .user-text-area {
+    /* 03 User Text */
+    .group-4 {
+      position: absolute;
+      top: 746px;
+      left: calc(50.00% - 181px);
+      width: 363px;
+      height: 73px;
+      background-color: #ebe4d6;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px #fffffa80;
+      z-index: 10;
+    }
+    #userTextInput {
       width: 100%;
-      min-height: 90px;
-      background: rgba(255, 235, 210, 0.03);
-      border: 1.5px solid var(--border);
-      border-radius: var(--r);
-      color: var(--text);
-      font-family: 'Noto Serif KR', serif;
-      font-size: 0.88rem;
-      line-height: 1.7;
-      padding: 0.85rem 1rem;
-      resize: vertical;
-      transition: border-color var(--ease), background var(--ease);
+      height: 100%;
+      background: transparent;
+      border: none;
+      padding: 12px;
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 500;
+      color: #544232;
+      font-size: 12px;
+      resize: none;
       outline: none;
     }
+    #userTextInput::placeholder { color: #a09279; }
 
-    .user-text-area::placeholder { color: var(--muted); }
+    /* Generate Action Button */
+    #btnGenerate {
+      position: absolute;
+      top: 840px;
+      left: calc(50.00% - 181px);
+      width: 363px;
+      height: 52px;
+      background-color: #CCBC9F;
+      border-radius: 8px;
+      border: none;
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #544232;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0px 0px 10px #fffffa80;
+      z-index: 20;
+    }
+    #btnGenerate:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .user-text-area:focus {
-      border-color: var(--accent);
-      background: rgba(196, 112, 58, 0.04);
+    /* Status / Loading */
+    .status-msg {
+      position: absolute;
+      top: 900px;
+      left: 0; width: 100%;
+      text-align: center;
+      font-family: sans-serif;
+      font-size: 12px;
+      color: #f3efe5;
+      display: none;
+    }
+    .status-msg.error { color: #ff6b6b; }
+
+    /* ── Results Container (Dynamic positioning below button) ── */
+    #dynamicResults {
+      position: absolute;
+      top: 939px;
+      width: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
     }
 
-    /* ── Responsive ── */
-    @media (max-width: 600px) {
-      header h1 { font-size: 1.55rem; }
-      .style-grid { grid-template-columns: 1fr; gap: 0.5rem; }
-      .style-option { display: flex; align-items: center; gap: 0.75rem; text-align: left; padding: 0.85rem 1rem; }
-      .style-emoji { margin-bottom: 0; font-size: 1.4rem; }
-      .results-grid { grid-template-columns: 1fr; }
-      .result-img-wrap { max-height: 280px; }
+    .text-wrapper-12 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #f3efe5;
+      font-size: 20px;
+      margin-bottom: 20px;
+    }
+
+    /* Image Box */
+    .group-8 {
+      width: 306px;
+      height: 306px;
+      box-shadow: 0px 0px 10px #fffffa80;
+      border-radius: 8px;
+      background-color: #111;
+      position: relative;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .group-8 img { width: 100%; height: 100%; object-fit: cover; }
+    
+    .group-11 {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background-color: #ccbc9f;
+      border-radius: 8px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .text-wrapper-20 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #534131;
+      font-size: 10px;
+    }
+
+    /* Caption Box */
+    .group-2 {
+      width: 306px;
+      background-color: #ebe4d6;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px #fffffa80;
+      padding: 12px;
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .text-wrapper-13 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #534131;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .text-wrapper-17 {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-family: "Inter", Helvetica, sans-serif;
+      font-weight: 400;
+      color: #a09279;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .text-wrapper-21 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 400;
+      color: #000000;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    /* Hashtags Box */
+    .group-3 {
+      width: 306px;
+      background-color: #ebe4d6;
+      border-radius: 8px;
+      box-shadow: 0px 0px 10px #fffffa80;
+      padding: 12px;
+      position: relative;
+      margin-bottom: 30px;
+    }
+    .text-wrapper-14 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 600;
+      color: #534131;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .text-wrapper-18 {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-family: "Inter", Helvetica, sans-serif;
+      font-weight: 400;
+      color: #a09279;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .hashtags-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .frame-tag {
+      background-color: #ffffff;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-family: "Inter", Helvetica, sans-serif;
+      font-size: 10px;
+      color: #534131;
+      cursor: pointer;
+    }
+    .text-wrapper-16 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 400;
+      color: #a09279;
+      font-size: 10px;
+    }
+
+    /* Actions */
+    .group-wrapper {
+      width: 203px;
+      height: 52px;
+      display: flex;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .group-9 {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 26px;
+      background: transparent;
+      border: 1px solid #544232;
+    }
+    .text-wrapper-19 {
+      font-family: "Pretendard Variable", Helvetica, sans-serif;
+      font-weight: 500;
+      color: #ccbc9f;
+      font-size: 14px;
+    }
+
+.btn-insta {
+      width: 306px;
+      height: 52px;
+      /* 기존 새로운 피드 버튼에 있던 그라데이션을 적용하고 톤을 살짝 더 화사하게 업그레이드 */
+      background: linear-gradient(90deg, #ebe5d7 0%, #ccbc9f 22%, #afa188 61%, #766352 100%);
+      border: none;
+      border-radius: 26px; /* 라운딩을 맞춰서 일체감 제공 */
+      color: #211d1a; /* 어두운 글자색으로 가독성 확보 */
+      font-family: "Pretendard Variable", sans-serif;
+      font-weight: 700; /* 조금 더 두껍게 변경 */
+      font-size: 15px; /* 크기 살짝 키움 */
+      cursor: pointer;
+      margin-bottom: 20px; /* 마진 조정 */
+      box-shadow: 0px 4px 15px rgba(235, 229, 215, 0.2); /* 은은한 네온 광택 효과 */
+      transition: all 0.2s ease;
+    }
+
+    /* Toast */
+    #toast { 
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
+      background: #F3EFE5; color: #544232; padding: 10px 20px; border-radius: 20px; 
+      font-size: 13px; font-weight: 600; display: none; z-index: 1000; 
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    }
+    #toast.show { display: block; }
+    .grommet-icons-next {
+      width: 17px;
+      height: 17px;
+      margin-left: 8px;
+    }
+
+    .line-md-arrow-down {
+      width: 5px;
+      height: 5px;
+    }
+    
+    .style-thumbnail {
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      max-width: 30px;
+      max-height: 25px;
+      object-fit: contain;
     }
   </style>
 </head>
 <body>
 
-<div class="container">
+<div class="screen">
+  
+  <!-- Static Figma Elements -->
+  <img class="subtract" src="/static/front/logo.svg" alt="향기도예" />
+  
+  <div class="text-wrapper-4">도자기 인스타 피드 생성기</div>
+  <p class="AI">사진 한 장 만으로 AI가 <br/>감성적인 이미지, 캡션, 해시태그를 모두 만들어 드립니다.</p>
 
-  <!-- ── Header ── -->
-  <header>
-    <div class="logo-wrap">🏺</div>
-    <h1>도자기 인스타 피드 생성기</h1>
-    <p>공방 사진 한 장으로 AI가 감성 이미지·캡션·해시태그를 만들어 드립니다</p>
-  </header>
+  <div class="div">사진 업로드</div>
+  
+  <!-- 01 Upload Zone -->
+  <div class="group" id="dropZone">
+    <input type="file" id="fileInput" accept="image/*" />
+    <div class="text-wrapper-5">여기를 클릭해 사진을 선택하세요.</div>
+    <p class="p">JPG, PNG, WEBP 최대 20MB</p>
 
-  <!-- ── 01 Upload ── -->
-  <div class="card" id="uploadCard">
-    <div class="section-label">01 — 사진 업로드</div>
-    <div class="drop-zone" id="dropZone">
-      <input type="file" id="fileInput" accept="image/*" aria-label="이미지 파일 선택" />
-      <span class="drop-icon">📷</span>
-      <p class="drop-main">사진을 여기에 드래그하거나 클릭해서 선택하세요</p>
-      <p class="drop-hint">JPG · PNG · WEBP — 최대 20 MB</p>
-    </div>
-    <div class="preview-area" id="previewArea">
+    <div id="previewArea">
       <img class="preview-thumb" id="previewThumb" src="" alt="미리보기" />
       <div class="preview-info">
         <div class="preview-name" id="previewName"></div>
-        <div class="preview-size" id="previewSize"></div>
       </div>
       <button class="btn-reset" id="btnReset">다시 선택</button>
     </div>
   </div>
 
-  <!-- ── 02 Style ── -->
-  <div class="card">
-    <div class="section-label">02 — 스타일 선택</div>
-    <div class="style-grid" role="radiogroup" aria-label="스타일 선택">
-      <div class="style-option active" data-style="warm" id="opt-warm" role="radio" aria-checked="true" tabindex="0">
-        <span class="style-emoji">🌅</span>
-        <h3>따뜻한</h3>
-        <p>자연광과 온기 있는 따뜻한 무드</p>
-      </div>
-      <div class="style-option" data-style="minimal" id="opt-minimal" role="radio" aria-checked="false" tabindex="0">
-        <span class="style-emoji">🤍</span>
-        <h3>미니멀</h3>
-        <p>깔끔하고 절제된 세련된 감성</p>
-      </div>
-      <div class="style-option" data-style="japanese" id="opt-japanese" role="radio" aria-checked="false" tabindex="0">
-        <span class="style-emoji">🎋</span>
-        <h3>일본풍</h3>
-        <p>고요하고 우아한 와비사비 미학</p>
-      </div>
-    </div>
+  <div class="text-wrapper-2">스타일 선택</div>
+
+  <!-- 02 Style Grid -->
+  <div class="style-opt-btn group-5 active" data-style="warm">
+    <div class="style-title">따뜻한</div>
+    <div class="style-desc">자연광과 온기의<br/>편안한 감성</div>
+    <img src="/static/assets/IMG_4179 7 (2).png" class="style-thumbnail" alt="따뜻한 감성" />
+  </div>
+  <div class="style-opt-btn group-6" data-style="minimal">
+    <div class="style-title">미니멀</div>
+    <div class="style-desc">깔끔하고 절제된 <br/>세련된 감성</div>
+    <img src="/static/assets/Object (2).png" class="style-thumbnail" alt="미니멀 감성" />
+  </div>
+  <div class="style-opt-btn group-7" data-style="traditional">
+    <div class="style-title">전통적</div>
+    <div class="style-desc">고요하고 우아함이<br/>느껴지는 무드</div>
+    <img src="/static/assets/Object-1 (2).png" class="style-thumbnail" alt="전통적 감성" />
   </div>
 
-  <!-- ── 03 User Text ── -->
-  <div class="card">
-    <div class="section-label">03 — 추가 정보 (선택)</div>
-    <textarea
-      id="userTextInput"
-      class="user-text-area"
-      placeholder="공방 이벤트, 공지사항, 날짜 등 AI가 반영하길 원하는 내용을 입력해 주세요. (선택 사항)"
-      aria-label="추가 정보 입력"
-    ></textarea>
+  <div class="text-wrapper-3">추가 정보(선택)</div>
+
+  <!-- 03 User Text -->
+  <div class="group-4">
+    <textarea id="userTextInput" placeholder="공방 이벤트, 공지사항, 날씨 등  &#10;AI가 반영하길 원하는 내용을 입력해 주세요."></textarea>
   </div>
 
-  <!-- ── Generate Button ── -->
-  <button id="btnGenerate" disabled aria-label="AI 피드 생성하기">
-    ✨ &nbsp;AI 피드 생성하기
-  </button>
+  <!-- Action -->
+  <button id="btnGenerate" disabled>피드 생성하기</button>
 
-  <!-- ── Error ── -->
-  <div class="error-box" id="errorBox" role="alert"></div>
+  <!-- Status -->
+  <div id="statusMsg" class="status-msg">AI가 콘텐츠를 생성하고 있어요...</div>
 
-  <!-- ── Loading ── -->
-  <div class="card" id="loadingSection" aria-live="polite" aria-label="생성 진행 상황">
-    <div class="loading-header">
-      <div class="spinner"></div>
-      <div>
-        <div class="loading-title">AI가 콘텐츠를 생성하고 있어요</div>
-        <div class="loading-sub">잠시만 기다려 주세요 · 약 30 ~ 50초 소요</div>
-      </div>
-    </div>
-    <div class="pipeline-steps">
-      <div class="pipeline-step waiting" data-step="0">
-        <span class="step-icon">🔍</span>
-        <span class="step-name">이미지 분석 (Gemini Vision)</span>
-        <span class="step-badge"></span>
-      </div>
-      <div class="pipeline-step waiting" data-step="1">
-        <span class="step-icon">🎨</span>
-        <span class="step-name">감성 무드 추출</span>
-        <span class="step-badge"></span>
-      </div>
-      <div class="pipeline-step waiting" data-step="2">
-        <span class="step-icon">✍️</span>
-        <span class="step-name">이미지 생성 프롬프트 작성</span>
-        <span class="step-badge"></span>
-      </div>
-      <div class="pipeline-step waiting" data-step="3">
-        <span class="step-icon">🖼️</span>
-        <span class="step-name">AI 이미지 생성</span>
-        <span class="step-badge"></span>
-      </div>
-      <div class="pipeline-step waiting" data-step="4">
-        <span class="step-icon">📝</span>
-        <span class="step-name">인스타그램 캡션 작성</span>
-        <span class="step-badge"></span>
-      </div>
-      <div class="pipeline-step waiting" data-step="5">
-        <span class="step-icon">🏷️</span>
-        <span class="step-name">해시태그 생성</span>
-        <span class="step-badge"></span>
-      </div>
-    </div>
-  </div>
+  <!-- Results Section -->
+  <div id="dynamicResults">
+    <div class="text-wrapper-12">생성 완료!</div>
 
-  <!-- ── Results ── -->
-  <div id="resultsSection">
-
-    <div class="results-header">
-      <div class="results-title">✨ 생성 완료!</div>
-      <div class="mood-badge" id="moodBadge"></div>
-    </div>
-
-    <div class="results-grid">
-
-      <!-- Generated Image -->
-      <div class="result-img-wrap" id="resultImgWrap">
-        <img id="resultImg" src="" alt="AI 생성 이미지" />
-        <div class="no-img-placeholder" id="noImgPlaceholder">
-          <span>🖼️</span>
-          <span>이미지 생성에 실패했습니다</span>
-        </div>
-        <button id="btnDownloadImg" class="btn-download" title="이미지 다운로드">
-          <span>⬇️</span> 다운로드
-        </button>
-      </div>
-
-      <!-- Caption + Hashtags -->
-      <div class="result-right">
-
-        <!-- Caption -->
-        <div class="result-card" style="flex: 0 0 auto;">
-          <div class="result-card-header">
-            <span class="card-label">캡션</span>
-            <button class="btn-copy" id="btnCopyCaption">
-              <span>📋</span><span id="lblCopyCaption">복사</span>
-            </button>
-          </div>
-          <div class="caption-text" id="captionText"></div>
-        </div>
-
-        <!-- Hashtags -->
-        <div class="result-card" style="flex: 1;">
-          <div class="result-card-header">
-            <span class="card-label">해시태그</span>
-            <button class="btn-copy" id="btnCopyHashtags">
-              <span>📋</span><span id="lblCopyHashtags">전체 복사</span>
-            </button>
-          </div>
-          <div class="hashtag-chips" id="hashtagChips"></div>
-          <div class="hashtags-footer">
-            <span style="font-size:0.72rem;color:var(--muted);">개별 태그를 클릭하면 바로 복사됩니다</span>
-          </div>
-        </div>
-
+    <!-- Image -->
+    <div class="group-8">
+      <img id="resultImg" src="" alt="결과 이미지" style="display:none;" />
+      <div class="group-11" id="btnDownloadImg" style="display:none;">
+        <div class="text-wrapper-20">다운로드</div>
+        <img class="line-md-arrow-down" src="/static/assets/line-md_arrow-down.svg" alt="다운로드 아이콘" />
       </div>
     </div>
 
-    <!-- Re-generate -->
-    <div class="result-actions">
-      <button id="btnInstaUpload" class="btn-insta"> &nbsp;인스타그램에 바로 올리기</button>
-      <button class="btn-regen" id="btnRegen">🔄 &nbsp;새로운 피드 생성하기</button>
+    <!-- Caption -->
+    <div class="group-2">
+      <div class="text-wrapper-13">캡션</div>
+      <div class="text-wrapper-17" id="btnCopyCaption">복사</div>
+      <div class="text-wrapper-21" id="captionText"></div>
     </div>
 
-  </div><!-- /resultsSection -->
+    <!-- Hashtags -->
+    <div class="group-3">
+      <div class="text-wrapper-14">해시태그</div>
+      <div class="text-wrapper-18" id="btnCopyHashtags">전체 복사</div>
+      <div class="hashtags-container" id="hashtagChips"></div>
+      <p class="text-wrapper-16">*개별 해시태그를 선택하면 바로 복사됩니다.</p>
+    </div>
 
-</div><!-- /container -->
+    <!-- End Actions -->
+    <button class="btn-insta" id="btnInstaUpload">인스타그램에 바로 올리기</button>
+    
+    <div class="group-wrapper" id="btnRegen">
+      <div class="group-9">
+        <div class="text-wrapper-19">새로운 피드 생성하기</div>
+        <img class="grommet-icons-next" src="/static/assets/grommet-icons_next.svg" alt="다음 아이콘" />
+      </div>
+    </div>
 
-<!-- ── Toast ── -->
-<div id="toast" role="status" aria-live="polite">
-  <span class="toast-icon">✓</span>
-  <span id="toastMsg"></span>
+  </div> <!-- /dynamicResults -->
+
 </div>
 
+<div id="toast"><span id="toastMsg"></span></div>
+
 <script>
-  /* ── State ── */
+  /* ── State & DOM ── */
   let selectedFile = null;
   let selectedStyle = 'warm';
   let captionStr = '';
   let hashtagsArr = [];
-  let stepTimers = [];
 
-  // Step transition timings (ms after start): each value = when step[i] → done, step[i+1] → active
-  const STEP_TRANS = [4500, 9000, 13500, 27000, 33000];
-
-  /* ── DOM refs ── */
   const dropZone       = document.getElementById('dropZone');
   const fileInput      = document.getElementById('fileInput');
   const previewArea    = document.getElementById('previewArea');
   const previewThumb   = document.getElementById('previewThumb');
   const previewName    = document.getElementById('previewName');
-  const previewSize    = document.getElementById('previewSize');
   const btnReset       = document.getElementById('btnReset');
   const btnGenerate    = document.getElementById('btnGenerate');
-  const errorBox       = document.getElementById('errorBox');
-  const loadingSection = document.getElementById('loadingSection');
-  const resultsSection = document.getElementById('resultsSection');
+  const statusMsg      = document.getElementById('statusMsg');
+  
+  const resultsSection = document.getElementById('dynamicResults');
   const resultImg      = document.getElementById('resultImg');
   const btnDownloadImg = document.getElementById('btnDownloadImg');
-  const noImgPh        = document.getElementById('noImgPlaceholder');
   const captionEl      = document.getElementById('captionText');
   const hashtagChipsEl = document.getElementById('hashtagChips');
-  const moodBadge      = document.getElementById('moodBadge');
+
   const toast          = document.getElementById('toast');
   const toastMsg       = document.getElementById('toastMsg');
-  const btnCopyCaption = document.getElementById('btnCopyCaption');
-  const btnCopyHashtags= document.getElementById('btnCopyHashtags');
 
-  /* ── Drag & Drop ── */
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f && f.type.startsWith('image/')) setFile(f);
-  });
-
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files[0]) setFile(fileInput.files[0]);
-  });
-
-  btnReset.addEventListener('click', clearFile);
+  /* ── File Upload ── */
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+  btnReset.addEventListener('click', (e) => { e.stopPropagation(); clearFile(); });
 
   function setFile(f) {
     selectedFile = f;
     previewThumb.src = URL.createObjectURL(f);
     previewName.textContent = f.name;
-    previewSize.textContent = fmtSize(f.size);
-    dropZone.style.display = 'none';
     previewArea.classList.add('show');
     btnGenerate.disabled = false;
   }
@@ -959,47 +613,27 @@
     selectedFile = null;
     fileInput.value = '';
     previewArea.classList.remove('show');
-    dropZone.style.display = '';
     btnGenerate.disabled = true;
-  }
-
-  function fmtSize(b) {
-    if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
-    return (b / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
   /* ── Style Selection ── */
-  document.querySelectorAll('.style-option').forEach(opt => {
-    opt.addEventListener('click', () => selectStyle(opt));
-    opt.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') selectStyle(opt); });
+  document.querySelectorAll('.style-opt-btn').forEach(opt => {
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('.style-opt-btn').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      selectedStyle = opt.dataset.style;
+    });
   });
 
-  function selectStyle(opt) {
-    document.querySelectorAll('.style-option').forEach(o => {
-      o.classList.remove('active');
-      o.setAttribute('aria-checked', 'false');
-    });
-    opt.classList.add('active');
-    opt.setAttribute('aria-checked', 'true');
-    selectedStyle = opt.dataset.style;
-  }
-
   /* ── Generate ── */
-  btnGenerate.addEventListener('click', generate);
-
-  async function generate() {
+  btnGenerate.addEventListener('click', async () => {
     if (!selectedFile) return;
 
-    // Reset UI state
-    errorBox.classList.remove('show');
-    resultsSection.classList.remove('show');
+    statusMsg.textContent = "AI가 콘텐츠를 생성하고 있어요... (약 30~50초 소요)";
+    statusMsg.className = "status-msg";
+    statusMsg.style.display = "block";
+    resultsSection.style.display = 'none';
     btnGenerate.disabled = true;
-
-    // Reset pipeline steps
-    document.querySelectorAll('.pipeline-step').forEach(s => s.className = 'pipeline-step waiting');
-
-    loadingSection.classList.add('show');
-    startStepAnimation();
 
     const fd = new FormData();
     fd.append('image', selectedFile);
@@ -1008,241 +642,78 @@
 
     try {
       const res = await fetch('/api/generate', { method: 'POST', body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      clearStepTimers();
-      completeAllSteps();
-
-      if (data.error) {
-          console.error("Backend Error:", data.error);
-          errorBox.textContent = "AI 생성 지연: " + data.error;
-          errorBox.classList.add('show');
-      }
-
-      await delay(500);
+      if (data.error) throw new Error(data.error);
       showResults(data);
     } catch (err) {
-      clearStepTimers();
-      loadingSection.classList.remove('show');
-      errorBox.textContent = '오류가 발생했습니다: ' + err.message;
-      errorBox.classList.add('show');
+      statusMsg.textContent = '오류: ' + err.message;
+      statusMsg.classList.add('error');
       btnGenerate.disabled = false;
     }
-  }
+  });
 
-  /* ── Step Animation ── */
-  function startStepAnimation() {
-    const steps = document.querySelectorAll('.pipeline-step');
-    // Step 0 starts immediately
-    if (steps[0]) steps[0].className = 'pipeline-step active';
-
-    STEP_TRANS.forEach((ms, i) => {
-      const t = setTimeout(() => {
-        if (steps[i])   steps[i].className = 'pipeline-step done';
-        if (steps[i+1]) steps[i+1].className = 'pipeline-step active';
-      }, ms);
-      stepTimers.push(t);
-    });
-  }
-
-  function clearStepTimers() {
-    stepTimers.forEach(t => clearTimeout(t));
-    stepTimers = [];
-  }
-
-  function completeAllSteps() {
-    document.querySelectorAll('.pipeline-step').forEach(s => s.className = 'pipeline-step done');
-  }
-
-  /* ── Show Results ── */
   function showResults(data) {
-    loadingSection.classList.remove('show');
+    statusMsg.style.display = 'none';
+    captionStr   = data.caption || '';
+    hashtagsArr  = data.hashtags || [];
 
-    captionStr   = data.caption  || 'API 통신 오류로 인해 캡션을 생성하지 못했습니다. (상단의 빨간색 에러 로그를 확인해 주세요)';
-    hashtagsArr  = (data.hashtags && data.hashtags.length > 0) ? data.hashtags : ['#생성오류', '#확인필요'];
-
-    // Mood
-    if (data.mood) {
-      moodBadge.textContent = '✦ ' + data.mood;
-      moodBadge.style.display = '';
-    } else {
-      moodBadge.style.display = 'none';
-    }
-
-    // Caption
     captionEl.textContent = captionStr;
-
-    // Hashtag chips
     hashtagChipsEl.innerHTML = '';
     hashtagsArr.forEach(tag => {
-      const chip = document.createElement('span');
-      chip.className = 'chip';
+      const chip = document.createElement('div');
+      chip.className = 'frame-tag';
       chip.textContent = tag;
-      chip.title = '클릭하면 복사';
-      chip.addEventListener('click', () => {
-        copyText(tag).then(() => showToast(tag + ' 복사됨!'));
-      });
+      chip.onclick = () => copyText(tag).then(() => showToast(tag + ' 복사됨!'));
       hashtagChipsEl.appendChild(chip);
     });
 
-    const resultsTitle = document.querySelector('.results-title');
-
-    // Generated image & Title Handling
     if (data.image_url) {
-      resultsTitle.innerHTML = '✨ 생성 완료!';
       resultImg.onload = () => { 
         resultImg.style.display = 'block'; 
-        noImgPh.style.display = 'none'; 
         btnDownloadImg.style.display = 'flex';
       };
-      resultImg.onerror = () => { 
-        resultsTitle.innerHTML = '⚠️ 이미지 로드 실패';
-        resultImg.style.display = 'none'; 
-        noImgPh.style.display = 'flex'; 
-        btnDownloadImg.style.display = 'none';
-      };
       resultImg.src = data.image_url;
-    } else {
-      resultsTitle.innerHTML = '⚠️ 이미지 생성 지연';
-      resultImg.style.display = 'none';
-      noImgPh.style.display = 'flex';
-      btnDownloadImg.style.display = 'none';
     }
 
-    resultsSection.classList.add('show');
-    requestAnimationFrame(() => {
-      resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    resultsSection.style.display = 'flex';
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }
 
-  /* ── Copy ── */
-  btnCopyCaption.addEventListener('click', () => {
-    copyText(captionStr).then(() => {
-      flashCopied(btnCopyCaption, document.getElementById('lblCopyCaption'), '복사', '복사됨 ✓');
-      showToast('캡션이 복사되었습니다!');
-    });
-  });
+  /* ── Utilities ── */
+  document.getElementById('btnCopyCaption').onclick = () => copyText(captionStr).then(() => showToast('캡션 복사 완료'));
+  document.getElementById('btnCopyHashtags').onclick = () => copyText(hashtagsArr.join(' ')).then(() => showToast('해시태그 복사 완료'));
+  document.getElementById('btnRegen').onclick = () => { clearFile(); resultsSection.style.display='none'; window.scrollTo(0,0); };
 
-  btnCopyHashtags.addEventListener('click', () => {
-    const all = hashtagsArr.join(' ');
-    copyText(all).then(() => {
-      flashCopied(btnCopyHashtags, document.getElementById('lblCopyHashtags'), '전체 복사', '복사됨 ✓');
-      showToast('해시태그 전체가 복사되었습니다!');
-    });
-  });
-
-  function flashCopied(btn, lbl, defaultTxt, copiedTxt) {
-    btn.classList.add('copied');
-    lbl.textContent = copiedTxt;
-    setTimeout(() => {
-      btn.classList.remove('copied');
-      lbl.textContent = defaultTxt;
-    }, 2200);
-  }
-
-  async function copyText(text) {
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      // Fallback for non-HTTPS
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none;';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-  }
-
-  /* ── Toast ── */
-  let toastTimer = null;
-  function showToast(msg) {
-    toastMsg.textContent = msg;
-    toast.classList.add('show');
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
-  }
-
-  /* ── Reset ── */
-  document.getElementById('btnRegen').addEventListener('click', resetAll);
-
-  function resetAll() {
-    clearFile();
-    document.getElementById('userTextInput').value = '';
-    captionStr = '';
-    hashtagsArr = [];
-    btnDownloadImg.style.display = 'none';
-    loadingSection.classList.remove('show');
-    resultsSection.classList.remove('show');
-    errorBox.classList.remove('show');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-  /* ── Download Image ── */
-  btnDownloadImg.addEventListener('click', async () => {
-    const url = resultImg.src;
-    if (!url) return;
-
+  btnDownloadImg.onclick = async () => {
     try {
-      const originalHTML = btnDownloadImg.innerHTML;
-      btnDownloadImg.innerHTML = '<span>⏳</span> 다운로드 중...';
-      btnDownloadImg.style.pointerEvents = 'none';
-
-      const response = await fetch(url);
+      const response = await fetch(resultImg.src);
       const blob = await response.blob();
-      const objectUrl = window.URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = 'pottery_feed.jpg';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(objectUrl);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'feed.jpg'; a.click();
+      window.URL.revokeObjectURL(url);
+    } catch(e) { showToast('다운로드 실패'); }
+  };
 
-      btnDownloadImg.innerHTML = originalHTML;
-      btnDownloadImg.style.pointerEvents = 'auto';
-      showToast('이미지가 다운로드되었습니다!');
+  document.getElementById('btnInstaUpload').onclick = async () => {
+    try {
+      await copyText(captionStr + '\n\n' + hashtagsArr.join(' '));
+      btnDownloadImg.click();
+      setTimeout(() => alert("텍스트 복사 및 이미지 다운로드 완료! 인스타그램에 붙여넣기 하세요."), 500);
+    } catch(e) { alert('복사 실패'); }
+  };
 
-    } catch (error) {
-      console.error('다운로드 실패:', error);
-      btnDownloadImg.innerHTML = '<span>⬇️</span> 다운로드';
-      btnDownloadImg.style.pointerEvents = 'auto';
-      showToast('다운로드 중 오류가 발생했습니다.');
-    }
-  });
+  async function copyText(t) {
+    if(navigator.clipboard) await navigator.clipboard.writeText(t);
+    else { const el = document.createElement('textarea'); el.value = t; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); }
+  }
 
-  /* ── Instagram Upload Automation ── */
-  const btnInstaUpload = document.getElementById('btnInstaUpload');
-  if (btnInstaUpload) {
-    btnInstaUpload.addEventListener('click', async () => {
-      // 1. 텍스트 병합 (캡션 + 해시태그)
-      const fullText = captionStr + '\n\n' + hashtagsArr.join(' ');
-      
-      try {
-        // 2. 클립보드에 전체 텍스트 복사
-        await copyText(fullText);
-        
-        // 3. 이미지 다운로드 트리거 (기존 다운로드 버튼 클릭 시뮬레이션)
-        btnDownloadImg.click();
-        
-        // 4. 사용자 안내 모달(Alert) 제공 (다운로드 시작을 위한 0.5초 대기)
-        setTimeout(() => {
-          alert("✨ 텍스트 복사 및 이미지 다운로드가 완료되었습니다!\n\n인스타그램 앱을 열고 다운로드된 이미지를 선택한 뒤, 내용 란에 '붙여넣기'만 하시면 됩니다.");
-        }, 500);
-        
-      } catch (error) {
-        console.error('인스타그램 업로드 준비 실패:', error);
-        alert('텍스트 복사 중 오류가 발생했습니다. 직접 복사 버튼을 이용해 주세요.');
-      }
-    });
+  let tTimer;
+  function showToast(msg) {
+    toastMsg.textContent = msg; toast.classList.add('show');
+    clearTimeout(tTimer); tTimer = setTimeout(() => toast.classList.remove('show'), 2000);
   }
 </script>
 </body>

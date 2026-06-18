@@ -1,0 +1,336 @@
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* 🎨 피그마에서 추출한 에센셜 컬러 시스템 매핑 */
+  :root {
+    --bg:       #211D1A; /* 홈 배경색 */
+    --surface:  #EBE5D7; /* 사각형 카드 배경색 */
+    --text-lit: #F3EFE5; /* 메인 미색 텍스트 */
+    --accent:   #544232; /* 내부 깊은 브라운 텍스트 */
+    --muted:    #A0927A; /* 플레이스홀더 및 설명 베이지 */
+    --point:    #CCBC9F; /* 포인트 샌드 베이지 */
+    --white:    #FFFFFF; /* 해시태그 칩 배경 */
+    --r-sm:     8px;
+    --r-lg:     26px;
+    --glow:     0px 0px 10px rgba(255, 255, 250, 0.5); /* 피그마 drop-shadow */
+    --ease:     0.25s ease-in-out;
+  }
+
+  body {
+    font-family: 'Pretendard Variable', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text-lit);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 2rem 0;
+  }
+
+  /* 📐 피그마 규격 맞춤형 모바일 콤팩트 컨테이너 */
+  .container {
+    width: 100%;
+    max-width: 402px; /* 피그마 홈 레이어 width */
+    padding: 0 20px 5rem 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    padding: 2rem 0 1rem;
+  }
+  
+  .logo-wrap {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+  }
+
+  header h1 {
+    font-size: 20px; /* 피그ma 크기 */
+    font-weight: 700;
+    color: var(--text-lit);
+    margin-bottom: 8px;
+  }
+
+  header p {
+    color: var(--point);
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 400;
+  }
+
+  /* ── Form Cards ── */
+  .card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-lit);
+  }
+
+  /* ── Upload Zone ── */
+  .drop-zone {
+    background: var(--surface);
+    border-radius: var(--r-sm);
+    box-shadow: var(--glow);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    transition: transform var(--ease);
+  }
+  
+  .drop-zone:hover { transform: scale(1.01); }
+
+  .drop-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .drop-main {
+    color: #000000;
+    font-size: 12px;
+    font-weight: 400;
+    margin-bottom: 6px;
+  }
+
+  .drop-hint {
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 500;
+  }
+
+  /* Preview */
+  .preview-area {
+    display: none;
+    background: var(--surface);
+    border-radius: var(--r-sm);
+    box-shadow: var(--glow);
+    padding: 16px;
+    align-items: center;
+    gap: 12px;
+  }
+  .preview-area.show { display: flex; }
+  .preview-thumb {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    object-fit: cover;
+  }
+  .preview-info { flex: 1; min-width: 0; color: #000; }
+  .preview-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview-size { font-size: 10px; color: var(--accent); }
+  .btn-reset {
+    background: transparent;
+    border: 1px solid var(--muted);
+    border-radius: 4px;
+    color: var(--accent);
+    padding: 4px 8px;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  /* ── Style Options Grid ── */
+  .style-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .style-option {
+    background: var(--surface);
+    border-radius: var(--r-sm);
+    box-shadow: var(--glow);
+    padding: 12px 8px;
+    min-height: 114px; /* 피그마 스펙 */
+    cursor: pointer;
+    transition: all var(--theme);
+    border: 2px solid transparent;
+    color: #000;
+  }
+
+  .style-option.active {
+    border-color: var(--white);
+    box-shadow: 0px 0px 15px rgba(255, 255, 255, 0.8);
+  }
+
+  .style-option h3 {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .style-option p {
+    font-size: 10px;
+    line-height: 1.2;
+    font-weight: 400;
+  }
+
+  /* ── Custom Text Input ── */
+  .user-text-area {
+    width: 100%;
+    min-height: 73px; /* 피그마 스펙 */
+    background: var(--surface);
+    border-radius: var(--r-sm);
+    box-shadow: var(--glow);
+    border: none;
+    outline: none;
+    padding: 12px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #000;
+  }
+  .user-text-area::placeholder {
+    color: var(--muted);
+  }
+
+  /* ── Generate Trigger Button ── */
+  #btnGenerate {
+    width: 100%;
+    padding: 14px;
+    background: var(--point);
+    color: var(--accent);
+    border: none;
+    border-radius: var(--r-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--glow);
+    margin-top: 8px;
+  }
+  #btnGenerate:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Results Dashboard ── */
+  #resultsSection { display: none; flex-direction: column; gap: 20px; }
+  #resultsSection.show { display: flex; }
+
+  .results-header .results-title {
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text-lit);
+    margin: 1rem 0;
+  }
+
+  .result-img-wrap {
+    width: 306px;
+    height: 306px; /* 피그마 1:1 정사각형 비율 */
+    margin: 0 auto;
+    border-radius: var(--r-sm);
+    box-shadow: var(--glow);
+    overflow: relative;
+    background: #111;
+    position: relative;
+  }
+
+  .result-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: none; }
+
+  /* 피그마 다운로드 배지 단추 */
+  .btn-download {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: var(--point);
+    border-radius: var(--r-sm);
+    color: var(--accent);
+    padding: 6px 10px;
+    font-size: 10px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .result-card {
+    background: var(--surface);
+    border-radius: var(--r-sm);
+    box-shadow: var(--glow);
+    padding: 16px;
+    position: relative;
+    color: #000;
+  }
+
+  .card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .caption-text {
+    font-size: 12px;
+    line-height: 1.4;
+    font-weight: 400;
+    color: #000000;
+  }
+
+  .btn-copy {
+    position: absolute;
+    bottom: 12px;
+    right: 16px;
+    font-size: 10px;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+
+  .hashtag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+
+  /* 피그마 스타일 흰색 라운드 칩 */
+  .chip {
+    background: var(--white);
+    border-radius: var(--r-sm);
+    padding: 5px 10px;
+    font-size: 10px;
+    color: var(--accent);
+    cursor: pointer;
+  }
+
+  .hashtags-footer {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* ── 메인 액션 알약형 하단 그라데이션 버튼 ── */
+  .result-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; margin-top: 1rem; }
+  
+  .btn-regen {
+    width: 203px; /* 피그마 규격 */
+    height: 52px;
+    background: linear-gradient(90deg, #EBE5D7 0%, #CCBC9F 22.12%, #AFA188 61.06%, #766352 100%);
+    border-radius: var(--r-lg); /* 26px 반원 알약 */
+    color: var(--bg);
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* 에러 및 토스트 알림 컴포넌트 */
+  .error-box { display: none; color: #ff6b6b; font-size: 11px; text-align: center; }
+  .error-box.show { display: block; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 11px; display: none; z-index: 1000; }
+</style>
